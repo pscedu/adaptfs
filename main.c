@@ -15,6 +15,28 @@
 
 #define STD_MOUNT_OPTIONS  "allow_other,max_write=134217728"
 
+struct transform {
+	off_t		 tr_in_pos;
+	size_t		 tr_in_len;
+	off_t		 tr_out_pos;
+	size_t		 tr_out_len;
+};
+
+struct sourcedata {
+	const char	*fil_pathfmt;
+	uint64_t	 fil_tilesize;
+	uint64_t	 fil_ntiles;
+	int		 fil_colordepth;
+dims
+};
+
+struct filter {
+	const char	*fil_pathfmt;
+	uint64_t	 fil_tilesize;
+	uint64_t	 fil_ntiles;
+			 fil_hashtbl;
+};
+
 char		 mountpoint[PATH_MAX];
 char		*ctlsockfn;
 
