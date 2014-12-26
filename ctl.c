@@ -31,8 +31,17 @@ ctl_getcreds(int s, struct pscfs_creds *pcrp)
 	return (rc);
 }
 
+int
+ctlcmd_load(int fd, struct psc_ctlmsghdr *mh, void *m)
+{
+	struct ctlmsg_load *l = m;
+
+	mir_load(l->fn, l->name);
+}
+
 struct psc_ctlop ctlops[] = {
-	PSC_CTLDEFOPS
+	PSC_CTLDEFOPS,
+	{ ctlcmd_load,	sizeof(struct ctlmsg_load) }
 };
 
 psc_ctl_thrget_t psc_ctl_thrgets[] = {
@@ -43,8 +52,7 @@ PFLCTL_SVR_DEFS;
 void
 ctlthr_main(__unusedx struct psc_thread *thr)
 {
-	psc_ctlthr_main(ctlsockfn, ctlops, nitems(ctlops),
-	    THRT_CTLAC);
+	psc_ctlthr_main(ctlsockfn, ctlops, nitems(ctlops), THRT_CTLAC);
 }
 
 void

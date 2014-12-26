@@ -1,216 +1,25 @@
 /* $Id$ */
 /* %PSC_COPYRIGHT% */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "pfl/ctlsvr.h"
 #include "pfl/fs.h"
 #include "pfl/fsmod.h"
 #include "pfl/pfl.h"
 #include "pfl/subsys.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "adaptfs.h"
 
 #define STD_MOUNT_OPTIONS  "allow_other,max_write=134217728"
 
-struct transform {
-	off_t		 tr_in_pos;
-	size_t		 tr_in_len;
-	off_t		 tr_out_pos;
-	size_t		 tr_out_len;
-};
-
-struct sourcedata {
-	const char	*fil_pathfmt;
-	uint64_t	 fil_tilesize;
-	uint64_t	 fil_ntiles;
-	int		 fil_colordepth;
-dims
-};
-
-struct filter {
-	const char	*fil_pathfmt;
-	uint64_t	 fil_tilesize;
-	uint64_t	 fil_ntiles;
-			 fil_hashtbl;
-};
-
 char		 mountpoint[PATH_MAX];
+const char	*progname;
 char		*ctlsockfn;
-
-const char	 *progname;
-
-void
-adaptfs_access(struct pscfs_req *pfr, pscfs_inum_t inum, int accmode)
-{
-}
-
-void
-adaptfs_create(struct pscfs_req *pfr, pscfs_inum_t pinum,
-    const char *name, int oflags, mode_t mode)
-{
-}
-
-void
-adaptfs_open(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
-{
-}
-
-void
-adaptfs_opendir(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
-{
-}
-
-void
-adaptfs_getattr(struct pscfs_req *pfr, pscfs_inum_t inum)
-{
-}
-
-void
-adaptfs_link(struct pscfs_req *pfr, pscfs_inum_t c_inum,
-    pscfs_inum_t p_inum, const char *newname)
-{
-}
-
-void
-adaptfs_mkdir(struct pscfs_req *pfr, pscfs_inum_t pinum,
-    const char *name, mode_t mode)
-{
-}
-
-void
-adaptfs_unlink(struct pscfs_req *pfr, pscfs_inum_t pinum,
-    const char *name)
-{
-}
-
-void
-adaptfs_rmdir(struct pscfs_req *pfr, pscfs_inum_t pinum,
-    const char *name)
-{
-}
-
-void
-adaptfs_mknod(struct pscfs_req *pfr, pscfs_inum_t pinum,
-    const char *name, mode_t mode, dev_t rdev)
-{
-}
-
-void
-adaptfs_readdir(struct pscfs_req *pfr, size_t size, off_t off,
-    void *data)
-{
-}
-
-void
-adaptfs_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
-    const char *name)
-{
-}
-
-void
-adaptfs_readlink(struct pscfs_req *pfr, pscfs_inum_t inum)
-{
-}
-
-void
-adaptfs_flush(struct pscfs_req *pfr, void *data)
-{
-}
-
-void
-adaptfs_release(struct pscfs_req *pfr, void *data)
-{
-}
-
-void
-adaptfs_releasedir(struct pscfs_req *pfr, void *data)
-{
-}
-
-void
-adaptfs_rename(struct pscfs_req *pfr, pscfs_inum_t opinum,
-    const char *oldname, pscfs_inum_t npinum, const char *newname)
-{
-}
-
-void
-adaptfs_statfs(struct pscfs_req *pfr, pscfs_inum_t inum)
-{
-}
-
-void
-adaptfs_symlink(struct pscfs_req *pfr, const char *buf,
-    pscfs_inum_t pinum, const char *name)
-{
-}
-
-void
-adaptfs_setattr(struct pscfs_req *pfr, pscfs_inum_t inum,
-    struct stat *stb, int to_set, void *data)
-{
-}
-
-void
-adaptfs_fsync(struct pscfs_req *pfr, int datasync_only, void *data)
-{
-}
-
-void
-adaptfs_fsyncdir(struct pscfs_req *pfr, int datasync_only, void *data)
-{
-}
-
-void
-adaptfs_destroy(void)
-{
-}
-
-void
-adaptfs_write(struct pscfs_req *pfr, const void *buf, size_t size,
-    off_t off, void *data)
-{
-}
-
-void
-adaptfs_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
-{
-}
-
-struct pscfs pscfs = {
-	adaptfs_access,
-	adaptfs_release,
-	adaptfs_releasedir,	/* releasedir */
-	adaptfs_create,
-	adaptfs_flush,
-	adaptfs_fsync,
-	adaptfs_fsyncdir,	/* fsyncdir */
-	adaptfs_getattr,
-	NULL,			/* ioctl */
-	adaptfs_link,
-	adaptfs_lookup,
-	adaptfs_mkdir,
-	adaptfs_mknod,
-	adaptfs_open,
-	adaptfs_opendir,
-	adaptfs_read,
-	adaptfs_readdir,
-	adaptfs_readlink,
-	adaptfs_rename,
-	adaptfs_rmdir,
-	adaptfs_setattr,
-	adaptfs_statfs,
-	adaptfs_symlink,
-	adaptfs_unlink,
-	adaptfs_destroy,
-	adaptfs_write,
-	NULL,
-	NULL,
-	NULL,
-	NULL
-};
+char		*adaptfs_dataset;
+psc_atomic64_t	 adaptfs_inum = PSC_ATOMIC64_INIT(0);
 
 void
 unmount(const char *mp)
@@ -252,7 +61,7 @@ __dead void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-dUV] [-o mountopt] [-S socket] node\n",
+	    "usage: %s [-dUV] [-o mountopt] [-S socket] dataset node\n",
 	    progname);
 	exit(1);
 }
@@ -293,7 +102,7 @@ main(int argc, char *argv[])
 			unmount_first = 1;
 			break;
 		case 'V':
-			errx(0, "revision is %.2f", .9);
+			errx(0, "revision is %d", ADAPTFS_VERSION);
 		default:
 			usage();
 		}
