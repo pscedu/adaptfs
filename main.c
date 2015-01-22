@@ -19,7 +19,6 @@ char		 mountpoint[PATH_MAX];
 const char	*progname;
 char		*ctlsockfn;
 char		*adaptfs_dataset;
-psc_atomic64_t	 adaptfs_inum = PSC_ATOMIC64_INIT(0);
 
 void
 unmount(const char *mp)

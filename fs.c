@@ -44,6 +44,7 @@ adaptfs_destroy(void)
 void
 adaptfs_flush(struct pscfs_req *pfr, void *data)
 {
+	pscfs_reply_flush(pfr, EROFS);
 }
 
 void
@@ -77,10 +78,20 @@ adaptfs_link(struct pscfs_req *pfr, pscfs_inum_t c_inum,
 	pscfs_reply_link(pfr, 0, 0, 0, NULL, 0, EROFS);
 }
 
+struct inode {
+	struct psc_hashent	i_hentry;
+};
+
 void
 adaptfs_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)
 {
+	adaptfs_inum_t inum;
+
+	inum = inum_lookup(pinum, name);
+	pscfs_reply_lookup(pfr, inum, 0, entry_timeout, attr_timeout,
+	    rc);
+
 }
 
 void
@@ -107,27 +118,49 @@ adaptfs_mknod(struct pscfs_req *pfr, pscfs_inum_t pinum,
 void
 adaptfs_open(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 {
+	int rc = 0, rflags = PSCFS_OPENF_DIO;
+	struct inode *ino;
+
+	if (oflags & (O_RDWR | O_WRONLY))
+		PFL_GOTOERR(out, rc = EROFS);
+
+	ino = inode_lookup(inum);
+	psc_assert(ino);
+
+ out:
+	pscfs_reply_open(pfr, ino, rflags, rc);
 }
 
 void
 adaptfs_opendir(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 {
+	int rc = 0, rflags = PSCFS_OPENF_KEEPCACHE;
+	struct inode *ino;
+
+	ino = inode_lookup(inum);
+	psc_assert(ino);
+
+	pscfs_reply_opendir(pfr, ino, rflags, rc);
 }
 
 void
 adaptfs_readdir(struct pscfs_req *pfr, size_t size, off_t off,
     void *data)
 {
-}
+	struct inode *ino = data;
+	int rc = 0;
 
-void
-adaptfs_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
-{
+	if (off >= ino->i_dlen)
+		pscfs_reply_readdir(pfr, 0, NULL, 0);
+	else
+		pscfs_reply_readdir(pfr, 0, ino->buf + off, size);
 }
 
 void
 adaptfs_readlink(struct pscfs_req *pfr, pscfs_inum_t inum)
 {
+	(void)inum;
+	pscfs_reply_readlink(pfr, NULL, ENOTSUP);
 }
 
 void

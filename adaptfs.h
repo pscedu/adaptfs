@@ -8,6 +8,8 @@
 
 #include "pfl/hashtbl.h"
 
+struct pscfs_req;
+
 enum {
 	THRT_CTL,
 	THRT_CTLAC,
@@ -55,6 +57,12 @@ struct file {
 	uint64_t		 f_inum;
 };
 
+struct inode {
+	uint64_t		 i_inum;
+	char			*i_basename;
+	mode_t			 i_type;
+};
+
 struct page {
 };
 
@@ -65,6 +73,8 @@ extern char		*adaptfs_dataset;
 extern psc_atomic64_t	 adaptfs_inum;
 
 void	mir_load(const char *, const char *);
+
+void	adaptfs_read(struct pscfs_req *, size_t, off_t, void *);
 
 /* control message types */
 #define CMT_LOAD	(NPCMT + 0)

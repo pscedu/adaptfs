@@ -6,6 +6,7 @@ include ${ROOTDIR}/Makefile.path
 PROG=		mount_adaptfs
 SRCS+=		ctl.c
 SRCS+=		fs.c
+SRCS+=		io.c
 SRCS+=		main.c
 SRCS+=		mir.c
 
