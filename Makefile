@@ -8,7 +8,6 @@ SRCS+=		ctl.c
 SRCS+=		fs.c
 SRCS+=		io.c
 SRCS+=		main.c
-SRCS+=		mir.c
 
 SRCS+=		${PFL_BASE}/fuse.c
 

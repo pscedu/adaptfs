@@ -1,13 +1,15 @@
 /* $Id$ */
+/* %PSC_COPYRIGHT% */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-psc_atomic64_t	 adaptfs_inum = PSC_ATOMIC64_INIT(0);
+struct psc_dynarray	adaptfs_inodes;
+psc_atomic64_t		adaptfs_inum = PSC_ATOMIC64_INIT(0);
 
 uint64_t
-path_hash(adaptfs_inum_t pinum, const char *base)
+path_hash(uint64_t pinum, const char *base)
 {
 	uint64_t g, key = pinum;
 	const unsigned char *p;
@@ -24,19 +26,107 @@ path_hash(adaptfs_inum_t pinum, const char *base)
 }
 
 struct inode *
-inode_lookup(adaptfs_inum_t pinum, const char *base)
+name_lookup(uint64_t pinum, const char *base)
 {
 	uint64_t key;
+
+	if (pinum == 1)
+		return (rootino);
 
 	key = path_hash(pinum, base);
 	return (psc_hashtbl_search(&ino_hashtbl, NULL, NULL, &key));
 }
 
-void
-inode_populate(const char *fmt, int X, int Y, int Z, int T)
+struct inode *
+inode_lookup(uint64_t inum)
 {
-	char rpath[PATH_MAX];
+	if (inum == 0 ||
+	    inum >= psc_atomic64_read(&adaptfs_inum))
+		return (NULL);
+	return (psc_dynarray_getpos(&adaptfs_inodes, inum - 1));
+}
+
+size_t
+add_dirent(void *buf, size_t bufsize, const char *name,
+    const struct stat *stb, off_t off)
+{
+	size_t entsize, namelen = strlen(name);
+
+	entsize = PFL_DIRENT_SIZE(namelen);
+	if (entsize <= bufsize && buf) {
+		unsigned entlen = PFL_DIRENT_NAME_OFFSET + namelen;
+		unsigned padlen = entsize - entlen;
+		struct pscfs_dirent *dirent = buf;
+
+		dirent->pfd_ino = stb->st_ino;
+		dirent->pfd_off = off;
+		dirent->pfd_namelen = namelen;
+		dirent->pfd_type = (stb->st_mode & 0170000) >> 12;
+		strncpy(dirent->pfd_name, name, namelen);
+		if (padlen)
+			memset(buf + entlen, 0, padlen);
+	}
+	return (entsize);
+}
+
+void
+adaptfs_add_dirent(struct inode *pino, const char *fn, mode_t mode,
+    uint64_t inum)
+{
+	struct stat stb;
+	struct stat stb;
+	size_t sum;
+	int dsize;
+
+	dsize = add_dirent(NULL, 0, fn, NULL, 0);
+	sum = pino->i_dsize + dsize;
+	memset(&stb, 0, sizeof(stb));
+	stb.st_mode = mode;
+	stb.st_ino = inum;
+
+	pino->i_dents = psc_realloc(pino->i_dents, sum, 0);
+
+	add_dirent(pino->i_dsize, dsize, fn, &stb, sum);
+	pino->i_dsize = sum;
+
+	psc_dynarray_add(&pino->i_dsizes, (void *)(unsigned long)dsize);
+}
+
+struct inode *
+inode_create(struct dataset *ds, struct inode *pino, const char *fn,
+    mode_t mode)
+{
 	struct inode *ino;
+
+	ino = PSCALLOC(sizeof(*ino));
+	psc_hashent_init(&ino_hashtbl, ino);
+	ino->i_basename = pfl_strdup(p);
+	ino->i_inum = psc_atomic64_inc_getnew(&adaptfs_inum);
+	psc_dynarray_add(&adaptfs_inodes, ino);
+	ino->i_type = mode;
+	ino->i_dataset = ds;
+
+	if (mode == S_IFDIR) {
+		adaptfs_add_dirent(ino, ".", S_IFDIR, ino->i_inum);
+		adaptfs_add_dirent(ino, "..", S_IFDIR, pino ?
+		    pino->i_inum : 1);
+	}
+
+	if (pino == NULL)
+		return;
+
+	ino->i_key = path_hash(pino->i_inum, fn);
+	psc_hashtbl_add_item(&ino_hashtbl, ino);
+
+	adaptfs_add_dirent(pino, fn, mode, ino->i_inum);
+}
+
+void
+inode_populate(struct dataset *ds, const char *fmt, int X, int Y, int Z,
+    int T)
+{
+	struct inode *ino, *pino;
+	char rpath[PATH_MAX];
 	int x, y, z, t;
 
 	for (x = 0; x < X; x++)
@@ -49,47 +139,18 @@ inode_populate(const char *fmt, int X, int Y, int Z, int T)
 			    FMTSTRCASE('z', "d", z)
 			    FMTSTRCASE('t', "d", t)
 			);
-			for (p = rpath; p; p = np) {
+			pino = rootino;
+			for (p = rpath; p; p = np, pino = ino) {
 				np = strchr(p, '/');
 				if (np == NULL)
 					break;
 				*np++ = '\0';
 
-				ino = PSCALLOC(sizeof(*ino));
-				psc_hashent_init(&ino_hashtbl, ino);
-				ino->i_basename = pfl_strdup(p);
-				ino->i_inum = psc_atomic64_inc_getnew(
-				    &adaptfs_inum);
-				ino->i_type = S_IFDIR;
-				psc_hashtbl_add_item(&ino_hashtbl, ino);
-				psc_dynarray_add();
-
-				int dsize = add_dirent(NULL, 0,
-				    entry.dirent.d_name, NULL, 0);
-				if (dsize > outbuf_resid)
-					break;
-				fstat.st_mode = S_IFREG;
-
-				outbuf_resid -= dsize;
-				add_dirent(outbuf + outbuf_off, dsize,
-				    entry.dirent.d_name, &fstat,
-				    entry.dirent.d_off); 
-				outbuf_off += dsize;
-
-				psc_dynarray_add(&dino->i_dsizes,
-				    dsize);
-
+				ino = name_lookup(pino->i_inum, p);
+				if (ino == NULL)
+					ino = inode_create(ds, pino, p,
+					    S_IFDIR);
 			}
-			ino = PSCALLOC(sizeof(*ino));
-			psc_hashent_init(&ino_hashtbl, ino);
-			ino->i_basename = pfl_strdup(p);
-			ino->i_inum = psc_atomic64_inc_getnew(
-			    &adaptfs_inum);
-			ino->i_type = S_IFREG;
-			key = path_hash(pinum, base);
-			psc_hashtbl_add_item(&ino_hashtbl, ino);
+			inode_create(ds, pino, p, S_IFREG);
 		    }
 }
-
-
-

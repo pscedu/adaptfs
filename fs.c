@@ -1,4 +1,5 @@
 /* $Id$ */
+/* %PSC_COPYRIGHT% */
 
 #include <sys/types.h>
 #include <sys/statvfs.h>
@@ -66,6 +67,13 @@ adaptfs_fsyncdir(struct pscfs_req *pfr, int datasync_only, void *data)
 void
 adaptfs_getattr(struct pscfs_req *pfr, pscfs_inum_t inum)
 {
+	struct inode *ino;
+	struct stat stb;
+
+	ino = inode_lookup(inum);
+
+
+	pscfs_reply_getattr(pfr, &stb, pscfs_attr_timeout, rc);
 }
 
 void
@@ -86,12 +94,11 @@ void
 adaptfs_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)
 {
-	adaptfs_inum_t inum;
+	uint64_t inum;
 
-	inum = inum_lookup(pinum, name);
+	inum = name_lookup(pinum, name);
 	pscfs_reply_lookup(pfr, inum, 0, entry_timeout, attr_timeout,
 	    rc);
-
 }
 
 void

@@ -1,0 +1,15 @@
+
+
+# mount_adaptfs /adaptfs
+
+# adaptctl load /harvfs/awetzel/mousebrain0/x%x/y%y/z%.pgm
+
+# adaptctl load small_vh2_272_384_368.vol 272:384:368:1:3 \
+     visual_human0/x%x/y%y/z%z.ppm 272:384:368:1:3 \
+     mir.so:foo.mir
+
+# adaptctl load small_vh2_272_384_368.vol 272:384:368:1:3 \
+     visual_human1/x%x/y%y/z%z.ppm 272:384:368:1:3 \
+     foo.so
+
+
