@@ -16,6 +16,8 @@
 #include "pfl/str.h"
 
 #include "adaptfs.h"
+#include "ctl.h"
+#include "mod.h"
 
 int
 ctl_getcreds(int s, struct pscfs_creds *pcrp)
@@ -29,31 +31,6 @@ ctl_getcreds(int s, struct pscfs_creds *pcrp)
 	pcrp->pcr_gid = gid;
 	pcrp->pcr_ngid = 1;
 	return (rc);
-}
-
-struct module {
-	void	*m_handle;
-};
-
-struct module *
-mod_load(const char *fn)
-{
-	struct module *m;
-
-	m = PSCALLOC(sizeof(*m));
-
-	m->m_handle = dlopen(fn, RTLD_NOW);
-	if (m->m_handle == NULL)
-		goto error;
-	m->m_readf = dlsym(m->m_handle, "adaptfs_module_read");
-	if (m->m_readf == NULL)
-		goto error;
-	return (m);
-
- error:
-	if (m->m_handle)
-		dlclose(m->m_handle);
-	return (NULL);
 }
 
 int

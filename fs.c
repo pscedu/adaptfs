@@ -86,10 +86,6 @@ adaptfs_link(struct pscfs_req *pfr, pscfs_inum_t c_inum,
 	pscfs_reply_link(pfr, 0, 0, 0, NULL, 0, EROFS);
 }
 
-struct inode {
-	struct psc_hashent	i_hentry;
-};
-
 void
 adaptfs_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)

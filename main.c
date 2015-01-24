@@ -130,7 +130,7 @@ main(int argc, char *argv[])
 	pscfs_entry_timeout = 8.;
 	pscfs_attr_timeout = 8.;
 
-	rootino = inode_create(NULL, "", S_IFDIR);
+	rootino = inode_create(NULL, NULL, "", S_IFDIR);
 
 	exit(pscfs_main(0));
 }

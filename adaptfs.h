@@ -16,18 +16,24 @@ enum {
 	THRT_FSMGR
 };
 
-struct raw_data {
-	const char		*rd_pathfmt;
-	uint64_t		 rd_tilesize;
-	uint64_t		 rd_ntiles;
-	int			 rd_colordepth;
-//				 rd_dims;
+struct module {
+	void			 *m_handle;	/* dlopen(3) handle */
+	void			(*m_readf)(void);
 };
 
 struct dataset {
+	struct module		*ds_module;
+	const char		*ds_arg;	/* argument to module */
+	const char		*ds_pathfmt;	/* pathspec to raw data */
+	int			 ds_width;	/* X dimension */
+	int			 ds_height;	/* Y dimension */
+	int			 ds_depth;	/* X dimension */
+	int			 ds_time;	/* duration */
+	int			 ds_colordepth;
 };
 
 struct inode {
+	struct pfl_hashentry	 i_hentry;
 	uint64_t		 i_inum;
 	char			*i_basename;
 	mode_t			 i_type;
@@ -36,17 +42,11 @@ struct inode {
 };
 
 struct page {
+	struct psc_listentry	 pg_lentry;
 };
 
-/*
- * This structure is attached to the FUSE "file handle" and provides
- * fs-specific data about the file.
- */
-struct adaptfs_file_info {
-};
-
-extern char		*ctlsockfn;
-extern struct inode	*rootino;
+extern char			*ctlsockfn;
+extern struct inode		*rootino;
 
 void	adaptfs_read(struct pscfs_req *, size_t, off_t, void *);
 
