@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "adaptfs/mod.h"
+#include "../mount_adaptfs/mod.h"
 
 unsigned char *
 zplane(int z)
