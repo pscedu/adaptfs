@@ -44,10 +44,8 @@ ctlcmd_load(int fd, struct psc_ctlmsghdr *mh, void *m)
 	if (mod == NULL)
 		return (psc_ctlsenderr(fd, mh, "module failed to load"));
 
-	ds = dataset_load(mod, l->in_fmt, l->in_x, l->in_y, l->in_z,
-	    l->in_t, l->arg);
-	inode_populate(ds, l->out_fmt, l->out_x, l->out_y, l->out_z,
-	    l->out_t);
+	ds = dataset_load(mod, l->in_fn, &l->in_props, l->arg);
+	inode_populate(ds, l->out_fn, &l->out_props);
 	return (1);
 }
 

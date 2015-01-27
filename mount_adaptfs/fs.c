@@ -14,20 +14,53 @@
 
 #include "adaptfs.h"
 
-void
-adaptfs_access(struct pscfs_req *pfr, pscfs_inum_t inum, int accmode)
-{
-	int rc = 0;
+#define BLKSIZE (1024 * 1024)
 
-	if (accmode & W_OK)
-		rc = EROFS;
-	else {
+#define adaptfs_stat(ino, stb)		_adaptfs_stat((ino), 0, (stb))
+#define adaptfs_statvfs(ino, sfb)	_adaptfs_stat((ino), 1, (sfb))
+
+int
+_adaptfs_stat(struct inode *ino, int do_statvfs, void *p)
+{
+	struct datafile *df;
+	struct props pr;
+
+	memset(&pr, 0, sizeof(pr));
+	df = adaptfs_getdatafile(ino->i_dataset, &pr);
+
+	if (do_statvfs) {
+		struct statvfs *sfb = p;
+
+		if (fstatvfs(df->df_fd, sfb) == -1)
+			warn("fstatvfs");
+
+		sfb->f_bsize = BLKSIZE;
+		//sfb->f_fsid = ADAPTFS_FSID;
+	} else {
+		struct stat *stb = p;
+
+		if (fstat(df->df_fd, stb) == -1)
+			warn("fstat");
+
+		stb->st_ino = ino->i_inum;
+		stb->st_nlink = 1;
+		//stb->st_size = ;
+		stb->st_blksize = BLKSIZE;
+		//stb->st_blocks = ;
 	}
-	pscfs_reply_access(pfr, rc);
+
+	return (0);
 }
 
 void
-adaptfs_create(struct pscfs_req *pfr, pscfs_inum_t pinum,
+fsop_access(struct pscfs_req *pfr, pscfs_inum_t inum, int accmode)
+{
+	(void)inum;
+	pscfs_reply_access(pfr, accmode & W_OK ? EROFS : 0);
+}
+
+void
+fsop_create(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name, int oflags, mode_t mode)
 {
 	(void)pinum;
@@ -38,18 +71,19 @@ adaptfs_create(struct pscfs_req *pfr, pscfs_inum_t pinum,
 }
 
 void
-adaptfs_destroy(void)
+fsop_destroy(void)
 {
 }
 
 void
-adaptfs_flush(struct pscfs_req *pfr, void *data)
+fsop_flush(struct pscfs_req *pfr, void *data)
 {
+	(void)data;
 	pscfs_reply_flush(pfr, EROFS);
 }
 
 void
-adaptfs_fsync(struct pscfs_req *pfr, int datasync_only, void *data)
+fsop_fsync(struct pscfs_req *pfr, int datasync_only, void *data)
 {
 	(void)datasync_only;
 	(void)data;
@@ -57,7 +91,7 @@ adaptfs_fsync(struct pscfs_req *pfr, int datasync_only, void *data)
 }
 
 void
-adaptfs_fsyncdir(struct pscfs_req *pfr, int datasync_only, void *data)
+fsop_fsyncdir(struct pscfs_req *pfr, int datasync_only, void *data)
 {
 	(void)datasync_only;
 	(void)data;
@@ -65,19 +99,19 @@ adaptfs_fsyncdir(struct pscfs_req *pfr, int datasync_only, void *data)
 }
 
 void
-adaptfs_getattr(struct pscfs_req *pfr, pscfs_inum_t inum)
+fsop_getattr(struct pscfs_req *pfr, pscfs_inum_t inum)
 {
 	struct inode *ino;
 	struct stat stb;
+	int rc;
 
 	ino = inode_lookup(inum);
-
-
+	rc = adaptfs_stat(ino, &stb);
 	pscfs_reply_getattr(pfr, &stb, pscfs_attr_timeout, rc);
 }
 
 void
-adaptfs_link(struct pscfs_req *pfr, pscfs_inum_t c_inum,
+fsop_link(struct pscfs_req *pfr, pscfs_inum_t c_inum,
     pscfs_inum_t p_inum, const char *newname)
 {
 	(void)c_inum;
@@ -87,18 +121,26 @@ adaptfs_link(struct pscfs_req *pfr, pscfs_inum_t c_inum,
 }
 
 void
-adaptfs_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
+fsop_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)
 {
-	uint64_t inum;
+	struct inode *ino;
+	struct stat stb;
+	int rc;
 
-	inum = name_lookup(pinum, name);
-	pscfs_reply_lookup(pfr, inum, 0, entry_timeout, attr_timeout,
-	    rc);
+	ino = name_lookup(pinum, name);
+	if (ino == NULL) {
+		pscfs_reply_lookup(pfr, 0, 0, pscfs_entry_timeout, &stb,
+		    pscfs_attr_timeout, ENOENT);
+		return;
+	}
+	rc = adaptfs_stat(ino, &stb);
+	pscfs_reply_lookup(pfr, ino->i_inum, 0, pscfs_entry_timeout,
+	    &stb, pscfs_attr_timeout, rc);
 }
 
 void
-adaptfs_mkdir(struct pscfs_req *pfr, pscfs_inum_t pinum,
+fsop_mkdir(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name, mode_t mode)
 {
 	(void)pinum;
@@ -108,7 +150,7 @@ adaptfs_mkdir(struct pscfs_req *pfr, pscfs_inum_t pinum,
 }
 
 void
-adaptfs_mknod(struct pscfs_req *pfr, pscfs_inum_t pinum,
+fsop_mknod(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name, mode_t mode, dev_t rdev)
 {
 	(void)pinum;
@@ -119,10 +161,12 @@ adaptfs_mknod(struct pscfs_req *pfr, pscfs_inum_t pinum,
 }
 
 void
-adaptfs_open(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
+fsop_open(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 {
 	int rc = 0, rflags = PSCFS_OPENF_DIO;
 	struct inode *ino;
+
+	(void)oflags;
 
 	if (oflags & (O_RDWR | O_WRONLY))
 		PFL_GOTOERR(out, rc = EROFS);
@@ -135,10 +179,12 @@ adaptfs_open(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 }
 
 void
-adaptfs_opendir(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
+fsop_opendir(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 {
 	int rc = 0, rflags = PSCFS_OPENF_KEEPCACHE;
 	struct inode *ino;
+
+	(void)oflags;
 
 	ino = inode_lookup(inum);
 	psc_assert(ino);
@@ -146,38 +192,62 @@ adaptfs_opendir(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 	pscfs_reply_opendir(pfr, ino, rflags, rc);
 }
 
-void
-adaptfs_readdir(struct pscfs_req *pfr, size_t size, off_t off,
-    void *data)
+int
+cmp(const void *a, const void *b)
 {
-	struct inode *ino = data;
-	int rc = 0;
+	const off_t *px = a, *py = b;
 
-	if (off >= ino->i_dlen)
-		pscfs_reply_readdir(pfr, 0, NULL, 0);
-	else
-		pscfs_reply_readdir(pfr, 0, ino->buf + off, size);
+	return (CMP(*px, *py));
 }
 
 void
-adaptfs_readlink(struct pscfs_req *pfr, pscfs_inum_t inum)
+fsop_readdir(struct pscfs_req *pfr, size_t size, off_t off,
+    void *data)
+{
+	struct inode *ino = data;
+	off_t toff;
+	int pos;
+
+	pos = psc_dynarray_bsearch(&ino->i_doffs, PSC_AGP(off, 0), cmp);
+	if (pos >= psc_dynarray_len(&ino->i_doffs)) {
+		pscfs_reply_readdir(pfr, NULL, 0, 0);
+		return;
+	}
+	toff = (off_t)psc_dynarray_getpos(&ino->i_doffs, pos);
+	if (toff != off) {
+		pscfs_reply_readdir(pfr, NULL, 0, EINVAL);
+		return;
+	}
+	/* XXX already have a good lower bound for the bsearch */
+	pos = psc_dynarray_bsearch(&ino->i_doffs,
+	    PSC_AGP(off + size, 0), cmp);
+	toff = (off_t)psc_dynarray_getpos(&ino->i_doffs, pos);
+	pscfs_reply_readdir(pfr, ino->i_dents + off, toff - off, size);
+}
+
+void
+fsop_readlink(struct pscfs_req *pfr, pscfs_inum_t inum)
 {
 	(void)inum;
 	pscfs_reply_readlink(pfr, NULL, ENOTSUP);
 }
 
 void
-adaptfs_release(struct pscfs_req *pfr, void *data)
+fsop_release(struct pscfs_req *pfr, void *data)
 {
+	(void)pfr;
+	(void)data;
 }
 
 void
-adaptfs_releasedir(struct pscfs_req *pfr, void *data)
+fsop_releasedir(struct pscfs_req *pfr, void *data)
 {
+	(void)pfr;
+	(void)data;
 }
 
 void
-adaptfs_rename(struct pscfs_req *pfr, pscfs_inum_t opinum,
+fsop_rename(struct pscfs_req *pfr, pscfs_inum_t opinum,
     const char *oldname, pscfs_inum_t npinum, const char *newname)
 {
 	(void)opinum;
@@ -188,7 +258,7 @@ adaptfs_rename(struct pscfs_req *pfr, pscfs_inum_t opinum,
 }
 
 void
-adaptfs_rmdir(struct pscfs_req *pfr, pscfs_inum_t pinum,
+fsop_rmdir(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)
 {
 	(void)pinum;
@@ -197,7 +267,7 @@ adaptfs_rmdir(struct pscfs_req *pfr, pscfs_inum_t pinum,
 }
 
 void
-adaptfs_setattr(struct pscfs_req *pfr, pscfs_inum_t inum,
+fsop_setattr(struct pscfs_req *pfr, pscfs_inum_t inum,
     struct stat *stb, int to_set, void *data)
 {
 	(void)inum;
@@ -208,19 +278,19 @@ adaptfs_setattr(struct pscfs_req *pfr, pscfs_inum_t inum,
 }
 
 void
-adaptfs_statfs(struct pscfs_req *pfr, pscfs_inum_t inum)
+fsop_statfs(struct pscfs_req *pfr, pscfs_inum_t inum)
 {
 	struct statvfs sfb;
-	int rc = 0;
+	struct inode *ino;
+	int rc;
 
-	(void)inum;
-	if (statvfs(adaptfs_dataset, &sfb) == -1)
-		rc = errno;
+	ino = inode_lookup(inum);
+	rc = adaptfs_statvfs(ino, &sfb);
 	pscfs_reply_statfs(pfr, &sfb, rc);
 }
 
 void
-adaptfs_symlink(struct pscfs_req *pfr, const char *buf,
+fsop_symlink(struct pscfs_req *pfr, const char *buf,
     pscfs_inum_t pinum, const char *name)
 {
 	(void)buf;
@@ -230,7 +300,7 @@ adaptfs_symlink(struct pscfs_req *pfr, const char *buf,
 }
 
 void
-adaptfs_write(struct pscfs_req *pfr, const void *buf, size_t size,
+fsop_write(struct pscfs_req *pfr, const void *buf, size_t size,
     off_t off, void *data)
 {
 	(void)buf;
@@ -241,7 +311,7 @@ adaptfs_write(struct pscfs_req *pfr, const void *buf, size_t size,
 }
 
 void
-adaptfs_unlink(struct pscfs_req *pfr, pscfs_inum_t pinum,
+fsop_unlink(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)
 {
 	(void)pinum;
@@ -250,32 +320,32 @@ adaptfs_unlink(struct pscfs_req *pfr, pscfs_inum_t pinum,
 }
 
 struct pscfs pscfs = {
-	adaptfs_access,
-	adaptfs_release,
-	adaptfs_releasedir,
-	adaptfs_create,
-	adaptfs_flush,
-	adaptfs_fsync,
-	adaptfs_fsyncdir,
-	adaptfs_getattr,
+	fsop_access,
+	fsop_release,
+	fsop_releasedir,
+	fsop_create,
+	fsop_flush,
+	fsop_fsync,
+	fsop_fsyncdir,
+	fsop_getattr,
 	NULL,			/* ioctl */
-	adaptfs_link,
-	adaptfs_lookup,
-	adaptfs_mkdir,
-	adaptfs_mknod,
-	adaptfs_open,
-	adaptfs_opendir,
-	adaptfs_read,
-	adaptfs_readdir,
-	adaptfs_readlink,
-	adaptfs_rename,
-	adaptfs_rmdir,
-	adaptfs_setattr,
-	adaptfs_statfs,
-	adaptfs_symlink,
-	adaptfs_unlink,
-	adaptfs_destroy,
-	adaptfs_write,
+	fsop_link,
+	fsop_lookup,
+	fsop_mkdir,
+	fsop_mknod,
+	fsop_open,
+	fsop_opendir,
+	fsop_read,
+	fsop_readdir,
+	fsop_readlink,
+	fsop_rename,
+	fsop_rmdir,
+	fsop_setattr,
+	fsop_statfs,
+	fsop_symlink,
+	fsop_unlink,
+	fsop_destroy,
+	fsop_write,
 	NULL,
 	NULL,
 	NULL,

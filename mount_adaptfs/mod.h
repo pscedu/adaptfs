@@ -9,6 +9,7 @@ struct props {
 	int			 p_height;	/* Y dimension */
 	int			 p_depth;	/* X dimension */
 	int			 p_time;	/* duration */
+	int			 p_colordepth;
 };
 #define p_x p_width
 #define p_y p_height
@@ -19,19 +20,22 @@ struct dataset {
 	struct module		*ds_module;
 	const char		*ds_arg;	/* argument to module */
 	struct props		 ds_props;
-	int			 ds_colordepth;
 };
 
 struct datafile {
 	int			 df_fd;
 	struct pfl_hashentry	 df_hentry;
+	void			*df_base;
+	const char		*df_fn;
 };
 
 struct page {
 	struct psc_listentry	 pg_lentry;
 };
+
 void *adaptfs_getdatafile();
 
-adaptfs_module_read();
+struct module *
+	mod_load(const char *);
 
 #endif /* _MOD_H_ */

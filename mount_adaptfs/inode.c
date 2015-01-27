@@ -75,8 +75,9 @@ adaptfs_add_dirent(struct inode *pino, const char *fn, mode_t mode,
 {
 	struct stat stb;
 	struct stat stb;
+	int dsize, last;
 	size_t sum;
-	int dsize;
+	off_t off;
 
 	dsize = add_dirent(NULL, 0, fn, NULL, 0);
 	sum = pino->i_dsize + dsize;
@@ -86,10 +87,16 @@ adaptfs_add_dirent(struct inode *pino, const char *fn, mode_t mode,
 
 	pino->i_dents = psc_realloc(pino->i_dents, sum, 0);
 
-	add_dirent(pino->i_dsize, dsize, fn, &stb, sum);
+	add_dirent(pino->i_dents + pino->i_dsize, dsize, fn, &stb, sum);
 	pino->i_dsize = sum;
 
-	psc_dynarray_add(&pino->i_dsizes, (void *)(unsigned long)dsize);
+	last = psc_dynarray_len(&pino->i_doffs);
+	if (last)
+		off = psc_dynarray_getpos(&pino->i_doffs, last - 1);
+	else
+		off = 0;
+
+	psc_dynarray_add(&pino->i_doffs, PFL_AGP(off + dsize, 0));
 }
 
 struct inode *
@@ -124,17 +131,16 @@ inode_create(struct dataset *ds, struct inode *pino, const char *fn,
 }
 
 void
-inode_populate(struct dataset *ds, const char *fmt, int X, int Y, int Z,
-    int T)
+inode_populate(struct dataset *ds, const char *fmt, struct props *p)
 {
 	struct inode *ino, *pino;
 	char rpath[PATH_MAX];
 	int x, y, z, t;
 
-	for (x = 0; x < X; x++)
-	    for (y = 0; y < Y; y++)
-		for (z = 0; z < Z; z++)
-		    for (t = 0; t < T; t++) {
+	for (x = 0; x < p->p_width; x++)
+	    for (y = 0; y < p->p_height; y++)
+		for (z = 0; z < p->p_depth; z++)
+		    for (t = 0; t < p->p_time; t++) {
 			(void)FMTSTR(rpath, sizeof(rpath), fmt,
 			    FMTSTRCASE('x', "d", x)
 			    FMTSTRCASE('y', "d", y)
