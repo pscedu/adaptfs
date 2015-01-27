@@ -4,6 +4,8 @@
 #ifndef _MOD_H_
 #define _MOD_H_
 
+#include "pfl/hashtbl.h"
+
 struct props {
 	int			 p_width;	/* X dimension */
 	int			 p_height;	/* Y dimension */
@@ -27,6 +29,8 @@ struct datafile {
 	struct pfl_hashentry	 df_hentry;
 	void			*df_base;
 	const char		*df_fn;
+	struct props		 df_props;
+	uint64_t		 df_propkey;
 };
 
 struct page {

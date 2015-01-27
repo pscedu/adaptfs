@@ -1,14 +1,15 @@
 /* $Id$ */
+/* %PSC_COPYRIGHT% */
 
+#include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* API exposed to module interface */
-void *
-adaptfs_getdatafile(struct dataset *ds, int x, int y, int z, int t)
-{
-}
+#include "pfl/alloc.h"
+
+#include "adaptfs.h"
+#include "mod.h"
 
 struct module *
 mod_load(const char *fn)

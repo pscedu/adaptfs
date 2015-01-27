@@ -19,9 +19,42 @@
 #include "adaptfs.h"
 
 struct psc_hashtbl datafiles;
+struct psc_hashtbl proptbl;
+
+uint64_t
+hash_props(const struct props *pr, const struct props *pi)
+{
+	uint64_t key = 0;
+
+	key = pi->p_x;
+	key += pi->p_y * pr->p_width;
+	key += pi->p_z * pr->p_width * pr->p_height;
+	key += pi->p_t * pr->p_width * pr->p_height * pr->p_depth;
+	return (key);
+}
 
 int
-dataset_loadfile(const char *fn)
+prop_cmp(const void *a, const void *b)
+{
+	const struct datafile *df = b;
+	const struct props *pi = a;
+
+	return (memcmp(pi, &df->df_props, sizeof(*pi)) == 0);
+}
+
+/* API exposed to module interface */
+void *
+adaptfs_getdatafile(struct dataset *ds, struct props *pi)
+{
+	uint64_t key;
+
+	key = hash_props(&ds->ds_props, pi);
+	return (psc_hashtbl_search(&proptbl, pi, NULL, &key));
+}
+
+int
+dataset_loadfile(const char *fn, const struct props *pr,
+    const struct props *pi)
 {
 	struct datafile *df;
 	struct stat stb;
@@ -49,6 +82,9 @@ dataset_loadfile(const char *fn)
 	df->df_fn = pfl_strdup(fn);
 	psc_hashent_init(&datafiles, df);
 	psc_hashtbl_add_item(&datafiles, df);
+	df->df_props = *pi;
+	df->df_propkey = hash_props(pr, pi);
+	psc_hashtbl_add_item(&proptbl, df);
 
  out:
 	if (rc) {
@@ -60,33 +96,31 @@ dataset_loadfile(const char *fn)
 }
 
 struct dataset *
-dataset_load(struct module *m, const char *fmt, struct props *p,
-    const char *arg)
+dataset_load(struct module *m, const char *fmt,
+    const struct props *pr, const char *arg)
 {
-	struct dataset *ds;
-	int x, y, z, t, rc;
 	char fn[PATH_MAX];
+	struct dataset *ds;
+	struct props pi;
+	int rc;
 
 	ds = PSCALLOC(sizeof(*ds));
 	ds->ds_module = m;
 	ds->ds_arg = pfl_strdup(arg);
-	memcpy(&ds->ds_props, p, sizeof(*p));
-	for (x = 0; x < p->p_width; x++)
-	    for (y = 0; y < p->p_height; y++)
-		for (z = 0; z < p->p_depth; z++)
-		    for (t = 0; t < p->p_time; t++) {
-			(void)FMTSTR(fn, sizeof(fn), fmt,
-			    FMTSTRCASE('x', "d", x)
-			    FMTSTRCASE('y', "d", y)
-			    FMTSTRCASE('z', "d", z)
-			    FMTSTRCASE('t', "d", t)
-			);
-			rc = dataset_loadfile(fn);
-			if (rc) {
-				PSCFREE(ds);
-				return (NULL);
-			}
-		    }
+	memcpy(&ds->ds_props, pr, sizeof(*pr));
+	PROPS_FOREACH(&pi, pr) {
+		(void)FMTSTR(fn, sizeof(fn), fmt,
+		    FMTSTRCASE('x', "d", pi.p_x)
+		    FMTSTRCASE('y', "d", pi.p_y)
+		    FMTSTRCASE('z', "d", pi.p_z)
+		    FMTSTRCASE('t', "d", pi.p_t)
+		);
+		rc = dataset_loadfile(fn, pr, &pi);
+		if (rc) {
+			PSCFREE(ds);
+			return (NULL);
+		}
+	}
 	return (ds);
 }
 
