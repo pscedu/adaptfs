@@ -1,4 +1,11 @@
 /* $Id$ */
+/* %PSC_COPYRIGHT% */
+
+/*
+ * adaptfs driver for the "visual human".
+ *
+ *
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +17,7 @@ unsigned char *
 zplane(int z)
 {
 	char *p = obuf;
+
 	sprintf(p, "P6\n%d %d\n255\n", X, Y);
 	hdrlen = strlen(p);
 	filelen = hdrlen + Y*X*C;
@@ -25,6 +33,7 @@ yplane(int y)
 {
 	unsigned char *op = obuf, *ip;
 	int x, z;
+
 	sprintf(op, "P6\n%d %d\n255\n", X, Z);
 	hdrlen = strlen(op);
 	filelen = hdrlen + Z*X*C;
@@ -44,6 +53,7 @@ xplane(int x)
 {
 	unsigned char *op = obuf, *ip;
 	int y, z;
+
 	sprintf(op, "P6\n%d %d\n255\n", Y, Z);
 	hdrlen = strlen(op);
 	filelen = hdrlen + Z*Y*C;
@@ -63,7 +73,9 @@ xplane(int x)
 
 static const char *image_path = "/image";
 
-static int vv_getattr(const char *path, struct stat *stbuf) {
+static int
+vv_getattr(const char *path, struct stat *stbuf)
+{
 	} else if(strcmp(path, image_path) == 0) {
 		zplane(-1); // kludge to set initial filelen
 		stbuf->st_size = filelen; // XXX how to get prior hdrlen
@@ -79,7 +91,8 @@ static int vv_getattr(const char *path, struct stat *stbuf) {
 	}
 }
 
-visualhuman_read()
+int
+adaptfs_module_read(struct inode *ino)
 {
 	void *p;
 
@@ -112,5 +125,4 @@ visualhuman_read()
 	} else
 		size = 0;
 	return size;
-
 }

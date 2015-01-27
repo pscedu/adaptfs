@@ -130,6 +130,10 @@ main(int argc, char *argv[])
 	pscfs_entry_timeout = 8.;
 	pscfs_attr_timeout = 8.;
 
+	/* core initialization */
+	psc_hashtbl_init(&datafiles, PHTF_STR, struct datafile,
+	    df_fn, df_hentry, 97, NULL, "datafiles");
+
 	rootino = inode_create(NULL, NULL, "", S_IFDIR);
 
 	exit(pscfs_main(0));

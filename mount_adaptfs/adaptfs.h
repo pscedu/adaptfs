@@ -21,17 +21,6 @@ struct module {
 	void			(*m_readf)(void);
 };
 
-struct dataset {
-	struct module		*ds_module;
-	const char		*ds_arg;	/* argument to module */
-	const char		*ds_pathfmt;	/* pathspec to raw data */
-	int			 ds_width;	/* X dimension */
-	int			 ds_height;	/* Y dimension */
-	int			 ds_depth;	/* X dimension */
-	int			 ds_time;	/* duration */
-	int			 ds_colordepth;
-};
-
 struct inode {
 	struct pfl_hashentry	 i_hentry;
 	uint64_t		 i_inum;
@@ -39,10 +28,7 @@ struct inode {
 	mode_t			 i_type;
 	struct psc_dynarray	 i_dsizes;
 	struct dataset		*i_dataset;
-};
-
-struct page {
-	struct psc_listentry	 pg_lentry;
+	struct props		 i_props;
 };
 
 extern char			*ctlsockfn;

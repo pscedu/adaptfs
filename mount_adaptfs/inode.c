@@ -106,6 +106,8 @@ inode_create(struct dataset *ds, struct inode *pino, const char *fn,
 	ino->i_type = mode;
 	ino->i_dataset = ds;
 
+	ino->i_dataset = ds;
+
 	if (mode == S_IFDIR) {
 		adaptfs_add_dirent(ino, ".", S_IFDIR, ino->i_inum);
 		adaptfs_add_dirent(ino, "..", S_IFDIR, pino ?

@@ -8,18 +8,12 @@
 
 struct ctlmsg_load {
 	char			 in_fn[NAME_MAX + 1];
-	int			 in_width;
-	int			 in_height;
-	int			 in_depth;
-	int			 in_time;
-	int			 in_colors;
+	struct props		 in_props;
+	int			 in_colordepth;
 
 	char			 out_fn[NAME_MAX + 1];
-	int			 out_width;
-	int			 out_height;
-	int			 out_depth;
-	int			 out_time;
-	int			 out_colors;
+	struct props		 out_props;
+	int			 out_colordepth;
 
 	char			 module[NAME_MAX + 1];
 	char			 arg[NAME_MAX + 1];
