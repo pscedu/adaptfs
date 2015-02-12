@@ -37,15 +37,24 @@ int
 ctlcmd_load(int fd, struct psc_ctlmsghdr *mh, void *m)
 {
 	struct ctlmsg_load *l = m;
-	struct dataset *ds;
-	struct module *mod;
+	const char **argnames, **argvals;
+	int i;
 
-	mod = mod_load(l->module);
-	if (mod == NULL)
-		return (psc_ctlsenderr(fd, mh, "module failed to load"));
+	if (l->nargs < 0 || l->nargs > NARGS_MAX)
+		return (psc_ctlsenderr(fd, mh,
+		    "invalid number of arguments"));
 
-	ds = dataset_load(mod, l->in_fn, &l->in_props, l->arg);
-	inode_populate(ds, l->out_fn, &l->out_props);
+	argnames = PSCALLOC(sizeof(char *) * l->nargs);
+	argvals = PSCALLOC(sizeof(char *) * l->nargs);
+
+	for (i = 0; i < l->nargs; i++) {
+		argnames[i] = pfl_strdup(l->argnames[i]);
+		argvals[i] = pfl_strdup(l->argvals[i]);
+	}
+
+	if (instance_load(l->name, l->module, argnames, argvals,
+	    l->nargs) == NULL)
+		return (psc_ctlsenderr(fd, mh, "instance failed to load"));
 	return (1);
 }
 

@@ -6,40 +6,40 @@
 
 #include "pfl/hashtbl.h"
 
-struct props {
-	int			 p_width;	/* X dimension */
-	int			 p_height;	/* Y dimension */
-	int			 p_depth;	/* X dimension */
-	int			 p_time;	/* duration */
-	int			 p_colordepth;
-};
-#define p_x p_width
-#define p_y p_height
-#define p_z p_depth
-#define p_t p_time
-
-struct dataset {
-	struct module		*ds_module;
-	const char		*ds_arg;	/* argument to module */
-	struct props		 ds_props;
-};
+struct stat;
 
 struct datafile {
-	int			 df_fd;
-	struct pfl_hashentry	 df_hentry;
-	void			*df_base;
-	const char		*df_fn;
-	struct props		 df_props;
-	uint64_t		 df_propkey;
+	int			  df_fd;
+	struct pfl_hashentry	  df_hentry;
+	void			 *df_base;	/* mmap */
+	const char		 *df_fn;
+};
+
+struct adaptfs_instance {
+	struct module		 *inst_module;
+	const char		 *inst_name;
+	const char		**inst_argnames;
+	const char		**inst_argvals;
+	int			  inst_nargs;
+	void			 *inst_ptr;
+	struct psc_hashtbl	  inst_pagetbl;
+	struct psc_spinlock	  inst_lock;
 };
 
 struct page {
-	struct psc_listentry	 pg_lentry;
+	struct psc_listentry	  pg_lentry;
+	struct psc_spinlock	  pg_lock;
+	int			  pg_refcnt;
+	int			  pg_flags;
+	struct psc_waitq	  pg_waitq;
+	void 			 *pg_base;
 };
 
-void *adaptfs_getdatafile();
+#define PGF_LOADING		(1 << 0)
 
-struct module *
-	mod_load(const char *);
+struct datafile *
+	 adaptfs_getdatafile(const char *, ...);
+void	 adaptfs_create_vfile(struct adaptfs_instance *, void *, size_t,
+	    struct stat *, int, int, const char *, ...);
 
 #endif /* _MOD_H_ */

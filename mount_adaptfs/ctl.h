@@ -6,15 +6,17 @@
 
 #include <limits.h>
 
+#define ARGNAME_MAX	16
+#define ARGVAL_MAX	(NAME_MAX + 1)
+#define NARGS_MAX	8
+
 struct ctlmsg_load {
-	char			 in_fn[NAME_MAX + 1];
-	struct props		 in_props;
-
-	char			 out_fn[NAME_MAX + 1];
-	struct props		 out_props;
-
 	char			 module[NAME_MAX + 1];
-	char			 arg[NAME_MAX + 1];
+	char			 name[NAME_MAX + 1];
+	int			 nargs;
+	int			 _pad;
+	char			 argnames[ARGNAME_MAX][NARGS_MAX];
+	char			 argvals[ARGVAL_MAX][NARGS_MAX];
 };
 
 /* control message types */

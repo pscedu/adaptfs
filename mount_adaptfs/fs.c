@@ -14,48 +14,10 @@
 
 #include "adaptfs.h"
 
-#define BLKSIZE (1024 * 1024)
-
-#define adaptfs_stat(ino, stb)		_adaptfs_stat((ino), 0, (stb))
-#define adaptfs_statvfs(ino, sfb)	_adaptfs_stat((ino), 1, (sfb))
-
-int
-_adaptfs_stat(struct inode *ino, int do_statvfs, void *p)
-{
-	struct datafile *df;
-	struct props pr;
-
-	memset(&pr, 0, sizeof(pr));
-	df = adaptfs_getdatafile(ino->i_dataset, &pr);
-
-	if (do_statvfs) {
-		struct statvfs *sfb = p;
-
-		if (fstatvfs(df->df_fd, sfb) == -1)
-			warn("fstatvfs");
-
-		sfb->f_bsize = BLKSIZE;
-		//sfb->f_fsid = ADAPTFS_FSID;
-	} else {
-		struct stat *stb = p;
-
-		if (fstat(df->df_fd, stb) == -1)
-			warn("fstat");
-
-		if (ino->i_type == S_IFDIR) {
-		} else {
-			stb->st_ino = ino->i_inum;
-			stb->st_nlink = 1;
-			stb->st_size = ino->i_dataset->ds_module->m_getsizef(ino) +
-			    snprintf(NULL, 0, "P6\n%6d %6d\n%3d\n", 0,
-				0, 0);
-			stb->st_blksize = BLKSIZE;
-			stb->st_blocks = stb->st_size / 512;
-		}
-	}
-
-	return (0);
-}
+struct statvfs adaptfs_sfb = {
+	.f_frsize = 512,
+	.f_bsize = BLKSIZE
+};
 
 void
 fsop_access(struct pscfs_req *pfr, pscfs_inum_t inum, int accmode)
@@ -108,12 +70,9 @@ void
 fsop_getattr(struct pscfs_req *pfr, pscfs_inum_t inum)
 {
 	struct inode *ino;
-	struct stat stb;
-	int rc;
 
 	ino = inode_lookup(inum);
-	rc = adaptfs_stat(ino, &stb);
-	pscfs_reply_getattr(pfr, &stb, pscfs_attr_timeout, rc);
+	pscfs_reply_getattr(pfr, &ino->i_stb, pscfs_attr_timeout, 0);
 }
 
 void
@@ -131,18 +90,15 @@ fsop_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)
 {
 	struct inode *ino;
-	struct stat stb;
-	int rc;
 
 	ino = name_lookup(pinum, name);
-	if (ino == NULL) {
-		pscfs_reply_lookup(pfr, 0, 0, pscfs_entry_timeout, &stb,
+	if (ino == NULL)
+		pscfs_reply_lookup(pfr, 0, 0, pscfs_entry_timeout, NULL,
 		    pscfs_attr_timeout, ENOENT);
-		return;
-	}
-	rc = adaptfs_stat(ino, &stb);
-	pscfs_reply_lookup(pfr, ino->i_inum, 0, pscfs_entry_timeout,
-	    &stb, pscfs_attr_timeout, rc);
+	else
+		pscfs_reply_lookup(pfr, ino->i_inum, 0,
+		    pscfs_entry_timeout, &ino->i_stb,
+		    pscfs_attr_timeout, 0);
 }
 
 void
@@ -286,13 +242,8 @@ fsop_setattr(struct pscfs_req *pfr, pscfs_inum_t inum,
 void
 fsop_statfs(struct pscfs_req *pfr, pscfs_inum_t inum)
 {
-	struct statvfs sfb;
-	struct inode *ino;
-	int rc;
-
-	ino = inode_lookup(inum);
-	rc = adaptfs_statvfs(ino, &sfb);
-	pscfs_reply_statfs(pfr, &sfb, rc);
+	(void)inum;
+	pscfs_reply_statfs(pfr, &adaptfs_sfb, 0);
 }
 
 void

@@ -60,7 +60,7 @@ __dead void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-dUV] [-o mountopt] [-S socket] dataset node\n",
+	    "usage: %s [-dUV] [-o mountopt] [-S socket] node\n",
 	    progname);
 	exit(1);
 }
@@ -68,6 +68,7 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
+	struct stat rootstb;
 	struct pscfs_args args = PSCFS_ARGS_INIT(0, NULL);
 	char c, *p, *noncanon_mp;
 	int unmount_first = 0;
@@ -134,7 +135,9 @@ main(int argc, char *argv[])
 	psc_hashtbl_init(&datafiles, PHTF_STR, struct datafile,
 	    df_fn, df_hentry, 97, NULL, "datafiles");
 
-	rootino = inode_create(NULL, NULL, "", S_IFDIR);
+	memset(&rootstb, 0, sizeof(rootstb));
+	rootstb.st_mode = S_IFDIR;
+	rootino = inode_create(NULL, NULL, "", NULL, &rootstb);
 
 	exit(pscfs_main(0));
 }

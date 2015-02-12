@@ -2,10 +2,12 @@
 /* %PSC_COPYRIGHT% */
 
 /*
- * adaptfs driver for the "visual human".
- *
- *
+ * adaptfs driver for the visual human project dataset.
+ * Reads the raw dataset and chops it into X, Y, and Z planes.
  */
+
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,135 +15,122 @@
 
 #include "../mount_adaptfs/mod.h"
 
-unsigned char *
-zplane(int z)
+#define C 3
+
+struct coord {
+	ssize_t x;
+	ssize_t y;
+	ssize_t z;
+};
+
+struct instance {
+	struct coord dim;
+	void *base;
+};
+
+int
+adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
+    size_t len, off_t off, void *pg)
 {
-	char *p = obuf;
+	struct instance *vhi = inst->inst_ptr;
+	struct coord i, *c = iptr;
+	unsigned char *ip, *op = pg;
 
-	sprintf(p, "P6\n%d %d\n255\n", X, Y);
-	hdrlen = strlen(p);
-	filelen = hdrlen + Y*X*C;
-	if(z >= 0) { // XXX fake kludge on z < 0
-		p += hdrlen;
-		memcpy(p, vol+z*(long)Y*X*C, Y*X*C);
-	}
-	return(obuf);
-}
+	(void)len;
 
-unsigned char *
-yplane(int y)
-{
-	unsigned char *op = obuf, *ip;
-	int x, z;
-
-	sprintf(op, "P6\n%d %d\n255\n", X, Z);
-	hdrlen = strlen(op);
-	filelen = hdrlen + Z*X*C;
-	if(y >= 0) { // XXX fake kludge on z < 0
-		op += hdrlen;
-		for(z = 0; z < Z; z++) {
-			ip = vol + (z*(long)X*Y+y*X)*C;
-			for(x = C*X; --x >= 0; )
-				*op++ = *ip++; // RGB
-		}
-	}
-	return(obuf);
-}
-
-unsigned char *
-xplane(int x)
-{
-	unsigned char *op = obuf, *ip;
-	int y, z;
-
-	sprintf(op, "P6\n%d %d\n255\n", Y, Z);
-	hdrlen = strlen(op);
-	filelen = hdrlen + Z*Y*C;
-	if(x >= 0) { // XXX fake kludge on z < 0
-		op += hdrlen;
-		for (z = 0; z < Z; z++) {
-			ip = vol + (z*(long)X*Y+x)*3;
-			for (y = 0; y < Y; y++) {
-				*op++ = ip[X*C*y+0]; // RGB
-				*op++ = ip[X*C*y+1]; // RGB
-				*op++ = ip[X*C*y+2]; // RGB
+	if (c->x != -1) {
+		/* x plane */
+		for (i.z = 0; i.z < vhi->dim.z; i.z++) {
+			ip = vhi->base +
+			    (i.z * vhi->dim.x * vhi->dim.y + c->x) * 3;
+			for (i.y = 0; i.y < vhi->dim.y; i.y++) {
+				off = vhi->dim.x * C * i.y;
+				*op++ = ip[off + 0];
+				*op++ = ip[off + 1];
+				*op++ = ip[off + 2];
 			}
 		}
+	} else if (c->y != -1) {
+		/* y plane */
+		for (i.z = 0; i.z < vhi->dim.z; i.z++) {
+			ip = vhi->base + (i.z * vhi->dim.x * vhi->dim.y +
+			    c->y * vhi->dim.x) * C;
+			for (i.x = C * vhi->dim.x; --i.x >= 0; )
+				*op++ = *ip++;
+		}
+	} else {
+		/* z plane */
+		memcpy(op, vhi->base + c->z * vhi->dim.y * vhi->dim.x * C,
+		    vhi->dim.y * vhi->dim.x * C);
 	}
-	return(obuf);
+	return (0);
 }
 
-static const char *image_path = "/image";
-
-static int
-adaptfs_module_getsize(struct inode *ino)
+size_t
+adaptfs_strtonum(const char *s)
 {
-	size_t len;
+	char *endp;
+	long l;
 
-	ino->i_;
-
-	switch () {
-	case _X:
-		filelen = hdrlen + Y*X*C;
-		break;
-	case _Y:
-		break;
-	case _Z:
-		break;
-	case _IMG:
-		break;
-	}
-
-	sprintf(op, "P6\n%d %d\n255\n", Y, Z);
-	hdrlen = strlen(op);
-
-	} else if (strcmp(path, image_path) == 0) {
-		zplane(-1); // kludge to set initial filelen
-		stbuf->st_size = filelen; // XXX how to get prior hdrlen
-	} else if (path[1] == 'Z') {
-		zplane(-1); // kludge to set initial filelen
-		stbuf->st_size = filelen; // XXX how to get prior hdrlen?
-	} else if (path[1] == 'Y') {
-		yplane(-1); // kludge to set initial filelen
-		stbuf->st_size = filelen; // XXX how to get prior hdrlen?
-	} else if (path[1] == 'X') {
-		xplane(-1); // kludge to set initial filelen
-		stbuf->st_size = filelen; // XXX how to get prior hdrlen?
-	}
+	errno = 0;
+	l = strtol(s, &endp, 10);
+	if ((l == 0 && errno) || endp == s || *endp || l >= INT_MAX)
+		errx(1, "invalid number");
+	return (l);
 }
 
 int
-adaptfs_module_read(struct inode *ino)
+adaptfs_module_load(struct adaptfs_instance *inst,
+    const char **argnames, const char **argvals, int nargs)
 {
-	void *p;
+	int i, w = 0, h = 0, d = 0;
+	const char *input = NULL;
+	struct instance *vhi;
+	struct datafile *df;
+	struct stat stb;
+	struct coord c;
 
-	p = adaptfs_getdatafile(ino->i_dataset, 0, 0, 0, 0);
+	inst->inst_ptr = vhi = malloc(sizeof(*vhi));
 
-	size_t len;
-	unsigned char *p = NULL;
-	if (path[1] == 'Z') {
-		int z = atoi(path+2);
-		p = zplane(z);
-		len = hdrlen+Y*X*C;
-	} else if (path[1] == 'Y') {
-		int y = atoi(path+2);
-		p = yplane(y);
-		len = hdrlen+Z*X*C;
-	} else if (path[1] == 'X') {
-		int x = atoi(path+2);
-		p = xplane(x);
-		len = hdrlen+Z*Y*C;
-	} else if (strcmp(path, image_path) == 0) {
-		p = zplane(172);
-		len = hdrlen+Y*X*C;
+	for (i = 0; i < nargs; i++) {
+		if (strcmp(argnames[i], "width") == 0)
+			vhi->dim.x = adaptfs_strtonum(argvals[i]);
+		else if (strcmp(argnames[i], "height") == 0)
+			vhi->dim.y = adaptfs_strtonum(argvals[i]);
+		else if (strcmp(argnames[i], "depth") == 0)
+			vhi->dim.z = adaptfs_strtonum(argvals[i]);
+		else if (strcmp(argnames[i], "input") == 0)
+			input = argnames[i];
+		else
+			errx(1, "invalid parameter");
 	}
-	if (!p)
-		return -ENOENT;
-	if (offset < len) {
-		if (offset + size > len)
-			size = len - offset;
-		memcpy(buf, p + offset, size);
-	} else
-		size = 0;
-	return size;
+
+	if (w == 0 || h == 0 || d == 0)
+		errx(1, "dimension not specified");
+
+	if (input == NULL)
+		errx(1, "input not specified");
+
+	df = adaptfs_getdatafile(input);
+	vhi->base = df->df_base;
+
+	if (fstat(df->df_fd, &stb) == -1)
+		err(1, "%s", input);
+
+	stb.st_size = vhi->dim.y * vhi->dim.z * C;
+	for (c.x = 0, c.y = c.z = -1; c.x < vhi->dim.x; c.x++)
+		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
+		    vhi->dim.y, vhi->dim.z, "x/%d.pgm", c.x);
+
+	stb.st_size = vhi->dim.x * vhi->dim.z * C;
+	for (c.y = 0, c.x = c.z = -1; c.y < vhi->dim.y; c.y++)
+		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
+		    vhi->dim.x, vhi->dim.z, "y/%d.pgm", c.y);
+
+	stb.st_size = vhi->dim.x * vhi->dim.y * C;
+	for (c.z = 0, c.x = c.y = -1; c.z < vhi->dim.z; c.z++)
+		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
+		    vhi->dim.x, vhi->dim.y, "z/%d.pgm", c.z);
+
+	return (0);
 }

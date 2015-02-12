@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +20,8 @@
 #include "adaptfs.h"
 
 struct psc_dynarray	adaptfs_inodes;
-psc_atomic64_t		adaptfs_inum = PSC_ATOMIC64_INIT(0);
+psc_atomic64_t		adaptfs_inum;
+psc_atomic64_t		adaptfs_volsize;
 struct psc_hashtbl	ino_hashtbl;
 
 uint64_t
@@ -114,22 +116,27 @@ adaptfs_add_dirent(struct inode *pino, const char *fn, mode_t mode,
 }
 
 struct inode *
-inode_create(struct dataset *ds, struct inode *pino, const char *fn,
-    mode_t mode)
+inode_create(struct adaptfs_instance *inst, struct inode *pino,
+    const char *fn, void *ptr, const struct stat *stb)
 {
 	struct inode *ino;
+
+	adaptfs_sfb.f_files++;
 
 	ino = PSCALLOC(sizeof(*ino));
 	psc_hashent_init(&ino_hashtbl, ino);
 	ino->i_basename = pfl_strdup(fn);
 	ino->i_inum = psc_atomic64_inc_getnew(&adaptfs_inum);
 	psc_dynarray_add(&adaptfs_inodes, ino);
-	ino->i_type = mode;
-	ino->i_dataset = ds;
+	ino->i_stb = *stb;
+	ino->i_stb.st_ino = ino->i_inum;
+	ino->i_inst = inst;
+	ino->i_ptr = ptr;
 
-	ino->i_dataset = ds;
+	if (ino->i_stb.st_mode == S_IFDIR) {
+		ino->i_stb.st_nlink = 2;
+		ino->i_stb.st_size = psc_dynarray_len(&ino->i_doffs);
 
-	if (mode == S_IFDIR) {
 		adaptfs_add_dirent(ino, ".", S_IFDIR, ino->i_inum);
 		adaptfs_add_dirent(ino, "..", S_IFDIR, pino ?
 		    pino->i_inum : 1);
@@ -141,36 +148,47 @@ inode_create(struct dataset *ds, struct inode *pino, const char *fn,
 	ino->i_key = path_hash(pino->i_inum, fn);
 	psc_hashtbl_add_item(&ino_hashtbl, ino);
 
-	adaptfs_add_dirent(pino, fn, mode, ino->i_inum);
+	adaptfs_add_dirent(pino, fn, stb->st_mode, ino->i_inum);
 	return (ino);
 }
 
 void
-inode_populate(struct dataset *ds, const char *fmt, struct props *pr)
+adaptfs_create_vfile(struct adaptfs_instance *inst, void *ptr, size_t len,
+    struct stat *stb, int width, int height, const char *fmt, ...)
 {
+	char *p, *np, fn[PATH_MAX];
 	struct inode *ino, *pino;
-	char *p, *np, rpath[PATH_MAX];
-	struct props pi;
+	va_list ap;
+	int n;
 
-	PROPS_FOREACH(&pi, pr) {
-		(void)FMTSTR(rpath, sizeof(rpath), fmt,
-		    FMTSTRCASE('x', "d", pi.p_x)
-		    FMTSTRCASE('y', "d", pi.p_y)
-		    FMTSTRCASE('z', "d", pi.p_z)
-		    FMTSTRCASE('t', "d", pi.p_t)
-		);
-		pino = rootino;
-		for (p = rpath; p; p = np, pino = ino) {
-			np = strchr(p, '/');
-			if (np == NULL)
-				break;
-			*np++ = '\0';
+	va_start(ap, fmt);
+	n = snprintf(fn, sizeof(fn), "%s/", inst->inst_name);
+	vsnprintf(fn + n, sizeof(fn) - n, fmt, ap);
+	va_end(ap);
 
-			ino = name_lookup(pino->i_inum, p);
-			if (ino == NULL)
-				ino = inode_create(ds, pino, p,
-				    S_IFDIR);
+	pino = rootino;
+	for (p = fn; p; p = np, pino = ino) {
+		np = strchr(p, '/');
+		if (np == NULL)
+			break;
+		*np++ = '\0';
+
+		ino = name_lookup(pino->i_inum, p);
+		if (ino == NULL) {
+			stb->st_mode = S_IFDIR;
+			ino = inode_create(inst, pino, p, NULL, stb);
 		}
-		inode_create(ds, pino, p, S_IFREG);
 	}
+	stb->st_mode = S_IFREG;
+	stb->st_nlink = 1;
+	stb->st_size += snprintf(NULL, 0, "P6\n%6d %6d\n%3d\n", 0, 0, 0);
+	stb->st_blksize = BLKSIZE;
+	stb->st_blocks = stb->st_size / 512;
+	ino = inode_create(inst, pino, p, pfl_memdup(ptr, len), stb);
+	ino->i_img_width = width;
+	ino->i_img_height = height;
+
+	psc_atomic64_add(&adaptfs_volsize, stb->st_size);
+	adaptfs_sfb.f_blocks = psc_atomic64_read(&adaptfs_volsize) /
+	    adaptfs_sfb.f_frsize;
 }
