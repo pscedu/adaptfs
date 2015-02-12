@@ -142,9 +142,8 @@ fsop_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
 	memset(iov, 0, sizeof(*iov));
 	rc = 0;
 
-	sprintf(p, "P6\n%d %d\n255\n", X, Y);
-
-		len = snprintf(NULL, 0, "P6\n%d %d\n255\n", Y, Z);
+	//sprintf(p, "P6\n%d %d\n255\n", X, Y);
+//	len = snprintf(NULL, 0, "P6\n%d %d\n255\n", Y, Z);
 
 	pscfs_reply_read(pfr, iov, 1, rc);
 }

@@ -76,8 +76,9 @@ fsop_create(struct pscfs_req *pfr, pscfs_inum_t pinum,
 }
 
 void
-fsop_destroy(void)
+fsop_destroy(struct pscfs_req *pfr)
 {
+	(void)pfr;
 }
 
 void
@@ -169,7 +170,7 @@ void
 fsop_open(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 {
 	int rc = 0, rflags = PSCFS_OPENF_DIO;
-	struct inode *ino;
+	struct inode *ino = NULL;
 
 	(void)oflags;
 
