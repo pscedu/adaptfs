@@ -42,11 +42,16 @@ _adaptfs_stat(struct inode *ino, int do_statvfs, void *p)
 		if (fstat(df->df_fd, stb) == -1)
 			warn("fstat");
 
-		stb->st_ino = ino->i_inum;
-		stb->st_nlink = 1;
-		//stb->st_size = ;
-		stb->st_blksize = BLKSIZE;
-		//stb->st_blocks = ;
+		if (ino->i_type == S_IFDIR) {
+		} else {
+			stb->st_ino = ino->i_inum;
+			stb->st_nlink = 1;
+			stb->st_size = ino->i_dataset->ds_module->m_getsizef(ino) +
+			    snprintf(NULL, 0, "P6\n%6d %6d\n%3d\n", 0,
+				0, 0);
+			stb->st_blksize = BLKSIZE;
+			stb->st_blocks = stb->st_size / 512;
+		}
 	}
 
 	return (0);

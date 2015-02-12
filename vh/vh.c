@@ -59,9 +59,9 @@ xplane(int x)
 	filelen = hdrlen + Z*Y*C;
 	if(x >= 0) { // XXX fake kludge on z < 0
 		op += hdrlen;
-		for(z = 0; z < Z; z++) {
+		for (z = 0; z < Z; z++) {
 			ip = vol + (z*(long)X*Y+x)*3;
-			for(y = 0; y < Y; y++) {
+			for (y = 0; y < Y; y++) {
 				*op++ = ip[X*C*y+0]; // RGB
 				*op++ = ip[X*C*y+1]; // RGB
 				*op++ = ip[X*C*y+2]; // RGB
@@ -74,18 +74,37 @@ xplane(int x)
 static const char *image_path = "/image";
 
 static int
-vv_getattr(const char *path, struct stat *stbuf)
+adaptfs_module_getsize(struct inode *ino)
 {
-	} else if(strcmp(path, image_path) == 0) {
+	size_t len;
+
+	ino->i_;
+
+	switch () {
+	case _X:
+		filelen = hdrlen + Y*X*C;
+		break;
+	case _Y:
+		break;
+	case _Z:
+		break;
+	case _IMG:
+		break;
+	}
+
+	sprintf(op, "P6\n%d %d\n255\n", Y, Z);
+	hdrlen = strlen(op);
+
+	} else if (strcmp(path, image_path) == 0) {
 		zplane(-1); // kludge to set initial filelen
 		stbuf->st_size = filelen; // XXX how to get prior hdrlen
-	} else if(path[1] == 'Z') {
+	} else if (path[1] == 'Z') {
 		zplane(-1); // kludge to set initial filelen
 		stbuf->st_size = filelen; // XXX how to get prior hdrlen?
-	} else if(path[1] == 'Y') {
+	} else if (path[1] == 'Y') {
 		yplane(-1); // kludge to set initial filelen
 		stbuf->st_size = filelen; // XXX how to get prior hdrlen?
-	} else if(path[1] == 'X') {
+	} else if (path[1] == 'X') {
 		xplane(-1); // kludge to set initial filelen
 		stbuf->st_size = filelen; // XXX how to get prior hdrlen?
 	}
@@ -100,26 +119,26 @@ adaptfs_module_read(struct inode *ino)
 
 	size_t len;
 	unsigned char *p = NULL;
-	if(path[1] == 'Z') {
+	if (path[1] == 'Z') {
 		int z = atoi(path+2);
 		p = zplane(z);
 		len = hdrlen+Y*X*C;
-	} else if(path[1] == 'Y') {
+	} else if (path[1] == 'Y') {
 		int y = atoi(path+2);
 		p = yplane(y);
 		len = hdrlen+Z*X*C;
-	} else if(path[1] == 'X') {
+	} else if (path[1] == 'X') {
 		int x = atoi(path+2);
 		p = xplane(x);
 		len = hdrlen+Z*Y*C;
-	} else if(strcmp(path, image_path) == 0) {
+	} else if (strcmp(path, image_path) == 0) {
 		p = zplane(172);
 		len = hdrlen+Y*X*C;
 	}
-	if(!p)
+	if (!p)
 		return -ENOENT;
-	if(offset < len) {
-		if(offset + size > len)
+	if (offset < len) {
+		if (offset + size > len)
 			size = len - offset;
 		memcpy(buf, p + offset, size);
 	} else

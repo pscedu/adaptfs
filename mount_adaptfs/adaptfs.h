@@ -21,6 +21,7 @@ enum {
 struct module {
 	void			 *m_handle;	/* dlopen(3) handle */
 	void			(*m_readf)(void);
+	void			(*m_getsizef)(struct inode *);
 };
 
 struct inode {

@@ -24,6 +24,9 @@ mod_load(const char *fn)
 	m->m_readf = dlsym(m->m_handle, "adaptfs_module_read");
 	if (m->m_readf == NULL)
 		goto error;
+	m->m_getsizef = dlsym(m->m_handle, "adaptfs_module_getsize");
+	if (m->m_getsizef == NULL)
+		goto error;
 	return (m);
 
  error:
