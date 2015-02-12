@@ -139,5 +139,7 @@ main(int argc, char *argv[])
 	rootstb.st_mode = S_IFDIR;
 	rootino = inode_create(NULL, NULL, "", NULL, &rootstb);
 
+	psc_dynarray_add(&pscfs_modules, &adaptfs_ops);
+
 	exit(pscfs_main(0));
 }

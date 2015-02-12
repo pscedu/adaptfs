@@ -157,9 +157,9 @@ fsop_opendir(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 int
 cmp(const void *a, const void *b)
 {
-	const off_t *px = a, *py = b;
+	const off_t px = (off_t)a, py = (off_t)b;
 
-	return (CMP(*px, *py));
+	return (CMP(px, py));
 }
 
 void
@@ -170,21 +170,31 @@ fsop_readdir(struct pscfs_req *pfr, size_t size, off_t off,
 	off_t toff;
 	int pos;
 
-	pos = psc_dynarray_bsearch(&ino->i_doffs, PSC_AGP(off, 0), cmp);
-	if (pos >= psc_dynarray_len(&ino->i_doffs)) {
-		pscfs_reply_readdir(pfr, NULL, 0, 0);
-		return;
+	if (off) {
+		pos = psc_dynarray_bsearch(&ino->i_doffs, (void *)off,
+		    cmp);
+		if (pos >= psc_dynarray_len(&ino->i_doffs)) {
+			pscfs_reply_readdir(pfr, NULL, 0, 0);
+			return;
+		}
+		toff = (off_t)psc_dynarray_getpos(&ino->i_doffs, pos);
+		if (toff != off) {
+			pscfs_reply_readdir(pfr, NULL, 0, EINVAL);
+			return;
+		}
 	}
-	toff = (off_t)psc_dynarray_getpos(&ino->i_doffs, pos);
-	if (toff != off) {
-		pscfs_reply_readdir(pfr, NULL, 0, EINVAL);
-		return;
-	}
-	/* XXX already have a good lower bound for the bsearch */
+	/*
+	 * Now calculate the size of this readdir reply.  It will be
+	 * bound by @size.
+	 *
+	 * XXX already have a good lower bound for the bsearch.
+	 */
 	pos = psc_dynarray_bsearch(&ino->i_doffs,
 	    PSC_AGP(off + size, 0), cmp);
+	if (pos >= psc_dynarray_len(&ino->i_doffs))
+		pos = psc_dynarray_len(&ino->i_doffs) - 1;
 	toff = (off_t)psc_dynarray_getpos(&ino->i_doffs, pos);
-	pscfs_reply_readdir(pfr, ino->i_dents + off, toff - off, size);
+	pscfs_reply_readdir(pfr, ino->i_dents + off, toff - off, 0);
 }
 
 void
@@ -276,7 +286,7 @@ fsop_unlink(struct pscfs_req *pfr, pscfs_inum_t pinum,
 	pscfs_reply_unlink(pfr, EROFS);
 }
 
-struct pscfs pscfs = {
+struct pscfs adaptfs_ops = {
 	fsop_access,
 	fsop_release,
 	fsop_releasedir,

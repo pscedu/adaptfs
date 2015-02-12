@@ -57,7 +57,7 @@ struct inode *
 inode_lookup(uint64_t inum)
 {
 	if (inum == 0 ||
-	    inum >= (uint64_t)psc_atomic64_read(&adaptfs_inum))
+	    inum > (uint64_t)psc_atomic64_read(&adaptfs_inum))
 		return (NULL);
 	return (psc_dynarray_getpos(&adaptfs_inodes, inum - 1));
 }

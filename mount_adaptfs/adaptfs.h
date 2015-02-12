@@ -64,5 +64,6 @@ extern struct inode		*rootino;
 extern struct psc_hashtbl	 datafiles;
 
 extern struct statvfs		 adaptfs_sfb;
+extern struct pscfs 		 adaptfs_ops;
 
 #endif /* _ADAPTFS_H_ */
