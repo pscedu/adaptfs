@@ -6,6 +6,8 @@
 
 #include <limits.h>
 
+#define PATH_CTLSOCK	"/var/run/mount_adaptfs.%h.sock"
+
 #define ARGNAME_MAX	16
 #define ARGVAL_MAX	(NAME_MAX + 1)
 #define NARGS_MAX	8
