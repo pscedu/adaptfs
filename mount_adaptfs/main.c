@@ -9,15 +9,17 @@
 #include "pfl/fs.h"
 #include "pfl/fsmod.h"
 #include "pfl/pfl.h"
+#include "pfl/stat.h"
 #include "pfl/subsys.h"
 
 #include "adaptfs.h"
+#include "ctl.h"
 
 #define STD_MOUNT_OPTIONS  "allow_other,max_write=134217728"
 
 char		 mountpoint[PATH_MAX];
 const char	*progname;
-char		*ctlsockfn;
+char		*ctlsockfn = PATH_CTLSOCK;
 struct inode	*rootino;
 
 void
@@ -68,6 +70,7 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
+	struct timespec ts;
 	struct stat rootstb;
 	struct pscfs_args args = PSCFS_ARGS_INIT(0, NULL);
 	char c, *p, *noncanon_mp;
@@ -135,11 +138,18 @@ main(int argc, char *argv[])
 	psc_hashtbl_init(&datafiles, PHTF_STR, struct datafile,
 	    df_fn, df_hentry, 97, NULL, "datafiles");
 
+	PFL_GETTIMESPEC(&ts);
 	memset(&rootstb, 0, sizeof(rootstb));
-	rootstb.st_mode = S_IFDIR;
+	rootstb.st_mode = S_IFDIR | 0755;
+	rootstb.st_nlink = 2;
+	PFL_STB_ATIME_SET(ts.tv_sec, ts.tv_nsec, &rootstb);
+	PFL_STB_MTIME_SET(ts.tv_sec, ts.tv_nsec, &rootstb);
+	PFL_STB_CTIME_SET(ts.tv_sec, ts.tv_nsec, &rootstb);
 	rootino = inode_create(NULL, NULL, "", NULL, &rootstb);
 
 	psc_dynarray_add(&pscfs_modules, &adaptfs_ops);
+
+	ctlthr_spawn();
 
 	exit(pscfs_main(0));
 }

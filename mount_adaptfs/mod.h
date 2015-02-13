@@ -32,7 +32,9 @@ struct page {
 	int			  pg_refcnt;
 	int			  pg_flags;
 	struct psc_waitq	  pg_waitq;
-	void 			 *pg_base;
+	void			 *pg_base;
+	uint64_t		  pg_inum;
+	struct pfl_hashentry	  pg_hentry;
 };
 
 #define PGF_LOADING		(1 << 0)

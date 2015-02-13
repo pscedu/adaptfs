@@ -22,35 +22,79 @@
 struct psc_dynarray	adaptfs_inodes;
 psc_atomic64_t		adaptfs_inum;
 psc_atomic64_t		adaptfs_volsize;
-struct psc_hashtbl	ino_hashtbl;
 
-uint64_t
-path_hash(uint64_t pinum, const char *base)
+int
+dnamecmp(const char *a, int na, const char *b, int nb)
 {
-	uint64_t g, key = pinum;
-	const unsigned char *p;
+	int ia = 0, ib = 0;
 
-	for (p = (void *)base; *p != '\0'; p++) {
-		key = (key << 4) + *p;
-		g = key & UINT64_C(0xf000000000000000);
-		if (g) {
-			key ^= g >> 56;
-			key ^= g;
-		}
-	}
-	return (key);
+	while (ia < na && ib < nb && *a == *b)
+		ia++, ib++, a++, b++;
+
+	/*
+	 * One hit the end; that means all chars up to this point
+	 * matched, so compare by string length.
+	 */
+	if (ia == na || ib == nb)
+		return (CMP(na, nb));
+	return (CMP(*a, *b));
+}
+
+int
+dentcmp(const void *a, const void *b)
+{
+	struct pscfs_dirent * const *px = a, *x = *px;
+	struct pscfs_dirent * const *py = b, *y = *py;
+
+	return (dnamecmp(x->pfd_name, x->pfd_namelen,
+	    y->pfd_name, y->pfd_namelen));
+}
+
+struct namelookup {
+	uint32_t namelen;
+	const char *name;
+};
+
+int
+namelookupcmp(const void *a, const void *b)
+{
+	const struct namelookup *l = a;
+	const struct pscfs_dirent *y = b;
+
+	return (dnamecmp(l->name, l->namelen, y->pfd_name,
+	    y->pfd_namelen));
 }
 
 struct inode *
-name_lookup(uint64_t pinum, const char *base)
+name_lookup(struct inode *pino, const char *fn)
 {
-	uint64_t key;
+	struct pscfs_dirent *dent;
+	struct namelookup dq;
+	void *p;
+	int n;
 
-	if (pinum == 1)
-		return (rootino);
+	if (pino->i_flags & INOF_DIRTY) {
+		pino->i_flags &= ~INOF_DIRTY;
 
-	key = path_hash(pinum, base);
-	return (psc_hashtbl_search(&ino_hashtbl, NULL, NULL, &key));
+		psc_dynarray_reset(&pino->i_dnames);
+		psc_dynarray_add(&pino->i_dnames, pino->i_dents);
+		DYNARRAY_FOREACH(p, n, &pino->i_doffs) {
+			if (n == psc_dynarray_len(&pino->i_doffs) - 1)
+				break;
+			psc_dynarray_add(&pino->i_dnames,
+			    PSC_AGP(pino->i_dents, (off_t)p));
+		}
+		psc_dynarray_sort(&pino->i_dnames, qsort, dentcmp);
+	}
+	dq.namelen = strlen(fn);
+	dq.name = fn;
+	n = psc_dynarray_bsearch(&pino->i_dnames, &dq, namelookupcmp);
+	if (n >= psc_dynarray_len(&pino->i_dnames))
+		return (NULL);
+	dent = psc_dynarray_getpos(&pino->i_dnames, n);
+	if (namelookupcmp(&dq, dent))
+		return (NULL);
+	return (inode_lookup(dent->pfd_ino));
 }
 
 struct inode *
@@ -89,30 +133,26 @@ void
 adaptfs_add_dirent(struct inode *pino, const char *fn, mode_t mode,
     uint64_t inum)
 {
+	size_t sum, oldoff;
 	struct stat stb;
-	int dsize, last;
-	size_t sum;
-	off_t off;
+	int dsize;
 
+	oldoff = pino->i_dsize;
 	dsize = add_dirent(NULL, 0, fn, NULL, 0);
 	sum = pino->i_dsize + dsize;
 	memset(&stb, 0, sizeof(stb));
 	stb.st_mode = mode;
 	stb.st_ino = inum;
 
+	pino->i_flags |= INOF_DIRTY;
 	pino->i_dents = psc_realloc(pino->i_dents, sum, 0);
-
-	add_dirent(pino->i_dents + pino->i_dsize, dsize, fn, &stb, sum);
+	add_dirent(PSC_AGP(pino->i_dents, pino->i_dsize), dsize, fn,
+	    &stb, sum);
 	pino->i_dsize = sum;
+	pino->i_stb.st_size++;
+	pino->i_stb.st_blocks++;
 
-	last = psc_dynarray_len(&pino->i_doffs);
-	if (last)
-		off = (off_t)psc_dynarray_getpos(&pino->i_doffs,
-		    last - 1);
-	else
-		off = 0;
-
-	psc_dynarray_add(&pino->i_doffs, PSC_AGP(off + dsize, 0));
+	psc_dynarray_add(&pino->i_doffs, PSC_AGP(sum, 0));
 }
 
 struct inode *
@@ -124,7 +164,6 @@ inode_create(struct adaptfs_instance *inst, struct inode *pino,
 	adaptfs_sfb.f_files++;
 
 	ino = PSCALLOC(sizeof(*ino));
-	psc_hashent_init(&ino_hashtbl, ino);
 	ino->i_basename = pfl_strdup(fn);
 	ino->i_inum = psc_atomic64_inc_getnew(&adaptfs_inum);
 	psc_dynarray_add(&adaptfs_inodes, ino);
@@ -133,9 +172,8 @@ inode_create(struct adaptfs_instance *inst, struct inode *pino,
 	ino->i_inst = inst;
 	ino->i_ptr = ptr;
 
-	if (ino->i_stb.st_mode == S_IFDIR) {
+	if (S_ISDIR(ino->i_stb.st_mode)) {
 		ino->i_stb.st_nlink = 2;
-		ino->i_stb.st_size = psc_dynarray_len(&ino->i_doffs);
 
 		adaptfs_add_dirent(ino, ".", S_IFDIR, ino->i_inum);
 		adaptfs_add_dirent(ino, "..", S_IFDIR, pino ?
@@ -144,9 +182,6 @@ inode_create(struct adaptfs_instance *inst, struct inode *pino,
 
 	if (pino == NULL)
 		return (ino);
-
-	ino->i_key = path_hash(pino->i_inum, fn);
-	psc_hashtbl_add_item(&ino_hashtbl, ino);
 
 	adaptfs_add_dirent(pino, fn, stb->st_mode, ino->i_inum);
 	return (ino);
@@ -173,13 +208,14 @@ adaptfs_create_vfile(struct adaptfs_instance *inst, void *ptr, size_t len,
 			break;
 		*np++ = '\0';
 
-		ino = name_lookup(pino->i_inum, p);
+		ino = name_lookup(pino, p);
 		if (ino == NULL) {
-			stb->st_mode = S_IFDIR;
+			stb->st_mode = S_IFDIR | 0755;
 			ino = inode_create(inst, pino, p, NULL, stb);
 		}
 	}
-	stb->st_mode = S_IFREG;
+
+	stb->st_mode = S_IFREG | 0644;
 	stb->st_nlink = 1;
 	stb->st_size += snprintf(NULL, 0, "P6\n%6d %6d\n%3d\n", 0, 0, 0);
 	stb->st_blksize = BLKSIZE;

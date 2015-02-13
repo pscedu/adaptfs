@@ -28,6 +28,8 @@ instance_load(const char *name, const char *fn, const char **argnames,
 	inst->inst_argnames = argnames;
 	inst->inst_argvals = argvals;
 	inst->inst_nargs = nargs;
+	psc_hashtbl_init(&inst->inst_pagetbl, 0, struct page,
+	    pg_inum, pg_hentry, 97, NULL, "pg-%s", name);
 
 	m->m_handle = dlopen(fn, RTLD_NOW);
 	if (m->m_handle == NULL)
@@ -45,6 +47,7 @@ instance_load(const char *name, const char *fn, const char **argnames,
 	return (m);
 
  error:
+	warnx("%s", dlerror());
 	if (m->m_handle)
 		dlclose(m->m_handle);
 	PSCFREE(m);

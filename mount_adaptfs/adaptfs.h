@@ -40,30 +40,35 @@ struct inode {
 	struct stat		 i_stb;
 	int			 i_img_width;
 	int			 i_img_height;
+	int			 i_flags;
 
 	/* directory fields */
+	struct psc_dynarray	 i_dnames;
 	struct psc_dynarray	 i_doffs;
 	void			*i_dents;
 	size_t			 i_dsize;
 };
 
-void		 fsop_read(struct pscfs_req *, size_t, off_t,
-		    void *);
+#define INOF_DIRTY	(1 << 0)
+
+void		 fsop_read(struct pscfs_req *, size_t, off_t, void *);
 
 struct inode	*inode_lookup(uint64_t);
 struct inode	*inode_create(struct adaptfs_instance *, struct inode *,
 		    const char *, void *, const struct stat *);
 
-struct inode	*name_lookup(uint64_t, const char *);
+struct inode	*name_lookup(struct inode *, const char *);
 
 struct module	*instance_load(const char *, const char *,
 		    const char **, const char **, int);
+
+void ctlthr_spawn(void);
 
 extern char			*ctlsockfn;
 extern struct inode		*rootino;
 extern struct psc_hashtbl	 datafiles;
 
 extern struct statvfs		 adaptfs_sfb;
-extern struct pscfs 		 adaptfs_ops;
+extern struct pscfs		 adaptfs_ops;
 
 #endif /* _ADAPTFS_H_ */

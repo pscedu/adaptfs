@@ -83,12 +83,12 @@ int
 adaptfs_module_load(struct adaptfs_instance *inst,
     const char **argnames, const char **argvals, int nargs)
 {
-	int i, w = 0, h = 0, d = 0;
 	const char *input = NULL;
 	struct instance *vhi;
 	struct datafile *df;
 	struct stat stb;
 	struct coord c;
+	int i;
 
 	inst->inst_ptr = vhi = malloc(sizeof(*vhi));
 
@@ -100,12 +100,14 @@ adaptfs_module_load(struct adaptfs_instance *inst,
 		else if (strcmp(argnames[i], "depth") == 0)
 			vhi->dim.z = adaptfs_strtonum(argvals[i]);
 		else if (strcmp(argnames[i], "input") == 0)
-			input = argnames[i];
+			input = argvals[i];
 		else
 			errx(1, "invalid parameter");
 	}
 
-	if (w == 0 || h == 0 || d == 0)
+	if (vhi->dim.x == 0 ||
+	    vhi->dim.y == 0 ||
+	    vhi->dim.z == 0)
 		errx(1, "dimension not specified");
 
 	if (input == NULL)

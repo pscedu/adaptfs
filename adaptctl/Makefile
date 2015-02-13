@@ -7,6 +7,6 @@ PROG=		adaptctl
 SRCS+=		adaptctl.c
 SRCS+=		${PFL_BASE}/ctlcli.c
 
-MODULES+=	pthread pscfs-hdrs curses clock pfl lnet-hdrs
+MODULES+=	pthread pscfs-hdrs curses clock pfl
 
 include ${PFLMK}

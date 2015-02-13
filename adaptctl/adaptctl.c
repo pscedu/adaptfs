@@ -20,13 +20,15 @@ cmd_load(int ac, char **av)
 	char *val;
 	int i;
 
-	if (ac < 2)
+	if (ac < 3)
 		errx(1, "usage: load name module [arg ...]");
+	av++;
+	ac--;
 
 	l = psc_ctlmsg_push(CMT_LOAD, sizeof(*l));
 	strlcpy(l->name, av[0], sizeof(l->name));
 	strlcpy(l->module, av[1], sizeof(l->module));
-	for (av += 2, i = 0; av; av++, i++) {
+	for (av += 2, i = 0; *av; av++, i++) {
 		val = strchr(*av, '=');
 		if (val == NULL)
 			errx(1, "invalid format");

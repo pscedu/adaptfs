@@ -89,16 +89,17 @@ void
 fsop_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)
 {
-	struct inode *ino;
+	struct inode *ino, *pino;
 
-	ino = name_lookup(pinum, name);
-	if (ino == NULL)
-		pscfs_reply_lookup(pfr, 0, 0, pscfs_entry_timeout, NULL,
-		    pscfs_attr_timeout, ENOENT);
-	else
+	pino = inode_lookup(pinum);
+	ino = name_lookup(pino, name);
+	if (ino)
 		pscfs_reply_lookup(pfr, ino->i_inum, 0,
 		    pscfs_entry_timeout, &ino->i_stb,
 		    pscfs_attr_timeout, 0);
+	else
+		pscfs_reply_lookup(pfr, 0, 0, pscfs_entry_timeout, NULL,
+		    pscfs_attr_timeout, ENOENT);
 }
 
 void
@@ -194,7 +195,7 @@ fsop_readdir(struct pscfs_req *pfr, size_t size, off_t off,
 	if (pos >= psc_dynarray_len(&ino->i_doffs))
 		pos = psc_dynarray_len(&ino->i_doffs) - 1;
 	toff = (off_t)psc_dynarray_getpos(&ino->i_doffs, pos);
-	pscfs_reply_readdir(pfr, ino->i_dents + off, toff - off, 0);
+	pscfs_reply_readdir(pfr, PSC_AGP(ino->i_dents, off), toff - off, 0);
 }
 
 void
