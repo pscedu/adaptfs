@@ -19,10 +19,7 @@
 
 #include "adaptfs.h"
 
-struct psc_hashtbl	datafiles;
-
-struct psc_poolmaster	 page_poolmaster;
-struct psc_poolmgr	*page_pool;
+struct psc_hashtbl	 datafiles;
 
 struct datafile *
 adaptfs_getdatafile(const char *fmt, ...)
@@ -78,8 +75,6 @@ page_reap(struct psc_poolmgr *m)
 	psc_pool_return(m, pg);
 	return (n);
 }
-
-struct psc_hashtbl pagetbl;
 
 void
 getpage_cb(void *a)
@@ -156,6 +151,13 @@ fsop_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
 	struct inode *ino = data;
 	struct iovec iov;
 	struct page *pg;
+
+	if (off >= ino->i_stb.st_size) {
+		iov.iov_base = NULL;
+		iov.iov_len = 0;
+		pscfs_reply_read(pfr, &iov, 1, 0);
+		return;
+	}
 
 	pg = getpage(ino->i_inst, ino);
 	iov.iov_base = pg->pg_base + off;

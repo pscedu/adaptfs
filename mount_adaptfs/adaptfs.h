@@ -67,6 +67,7 @@ void ctlthr_spawn(void);
 extern char			*ctlsockfn;
 extern struct inode		*rootino;
 extern struct psc_hashtbl	 datafiles;
+extern struct psc_poolmgr	*page_pool;
 
 extern struct statvfs		 adaptfs_sfb;
 extern struct pscfs		 adaptfs_ops;

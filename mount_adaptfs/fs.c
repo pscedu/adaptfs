@@ -47,7 +47,7 @@ void
 fsop_flush(struct pscfs_req *pfr, void *data)
 {
 	(void)data;
-	pscfs_reply_flush(pfr, EROFS);
+	pscfs_reply_flush(pfr, 0);
 }
 
 void
@@ -210,6 +210,7 @@ fsop_release(struct pscfs_req *pfr, void *data)
 {
 	(void)pfr;
 	(void)data;
+	pscfs_reply_release(pfr, 0);
 }
 
 void
@@ -217,6 +218,7 @@ fsop_releasedir(struct pscfs_req *pfr, void *data)
 {
 	(void)pfr;
 	(void)data;
+	pscfs_reply_releasedir(pfr, 0);
 }
 
 void

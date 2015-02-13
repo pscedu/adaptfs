@@ -9,6 +9,7 @@
 #include "pfl/fs.h"
 #include "pfl/fsmod.h"
 #include "pfl/pfl.h"
+#include "pfl/pool.h"
 #include "pfl/stat.h"
 #include "pfl/subsys.h"
 
@@ -16,6 +17,9 @@
 #include "ctl.h"
 
 #define STD_MOUNT_OPTIONS  "allow_other,max_write=134217728"
+
+struct psc_poolmaster	 page_poolmaster;
+struct psc_poolmgr	*page_pool;
 
 char		 mountpoint[PATH_MAX];
 const char	*progname;
@@ -148,6 +152,10 @@ main(int argc, char *argv[])
 	rootino = inode_create(NULL, NULL, "", NULL, &rootstb);
 
 	psc_dynarray_add(&pscfs_modules, &adaptfs_ops);
+
+	psc_poolmaster_init(&page_poolmaster, struct page,
+	    pg_lentry, PPMF_AUTO, 64, 64, 0, NULL, NULL, NULL, "page");
+	page_pool = psc_poolmaster_getmgr(&page_poolmaster);
 
 	ctlthr_spawn();
 
