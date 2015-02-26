@@ -117,6 +117,7 @@ getpage(struct adaptfs_instance *inst, struct inode *ino)
 	memset(pg, 0, sizeof(*pg));
 	INIT_SPINLOCK(&pg->pg_lock);
 	pg->pg_refcnt = 1;
+	pg->pg_inum = ino->i_inum;
 	pg->pg_flags = PGF_LOADING;
 	pg->pg_base = PSCALLOC(ino->i_stb.st_size);
 	psc_hashent_init(&inst->inst_pagetbl, pg);
@@ -127,8 +128,8 @@ getpage(struct adaptfs_instance *inst, struct inode *ino)
 	    "P6\n%6d %6d\n%3d\n", ino->i_img_width, ino->i_img_height,
 	    255);
 	psc_assert(n >= 0);
-	inst->inst_module->m_readf(inst, ino, ino->i_stb.st_size, 0,
-	    pg->pg_base + n);
+	inst->inst_module->m_readf(inst, ino->i_ptr, ino->i_stb.st_size,
+	    0, pg->pg_base + n);
 
 	spinlock(&pg->pg_lock);
 	pg->pg_flags &= ~PGF_LOADING;
@@ -158,6 +159,9 @@ fsop_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
 		pscfs_reply_read(pfr, &iov, 1, 0);
 		return;
 	}
+
+	if (off + size > ino->i_stb.st_size)
+		size = ino->i_stb.st_size - off;
 
 	pg = getpage(ino->i_inst, ino);
 	iov.iov_base = pg->pg_base + off;

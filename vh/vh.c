@@ -41,7 +41,7 @@ adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
 	if (c->x != -1) {
 		/* x plane */
 		for (i.z = 0; i.z < vhi->dim.z; i.z++) {
-			ip = vhi->base +
+			ip = (unsigned char *)vhi->base +
 			    (i.z * vhi->dim.x * vhi->dim.y + c->x) * 3;
 			for (i.y = 0; i.y < vhi->dim.y; i.y++) {
 				off = vhi->dim.x * C * i.y;
@@ -53,14 +53,16 @@ adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
 	} else if (c->y != -1) {
 		/* y plane */
 		for (i.z = 0; i.z < vhi->dim.z; i.z++) {
-			ip = vhi->base + (i.z * vhi->dim.x * vhi->dim.y +
+			ip = (unsigned char *)vhi->base +
+			    (i.z * vhi->dim.x * vhi->dim.y +
 			    c->y * vhi->dim.x) * C;
 			for (i.x = C * vhi->dim.x; --i.x >= 0; )
 				*op++ = *ip++;
 		}
 	} else {
 		/* z plane */
-		memcpy(op, vhi->base + c->z * vhi->dim.y * vhi->dim.x * C,
+		memcpy(op, (unsigned char *)vhi->base +
+		    c->z * vhi->dim.y * vhi->dim.x * C,
 		    vhi->dim.y * vhi->dim.x * C);
 	}
 	return (0);
@@ -122,17 +124,17 @@ adaptfs_module_load(struct adaptfs_instance *inst,
 	stb.st_size = vhi->dim.y * vhi->dim.z * C;
 	for (c.x = 0, c.y = c.z = -1; c.x < vhi->dim.x; c.x++)
 		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
-		    vhi->dim.y, vhi->dim.z, "x/%d.pgm", c.x);
+		    vhi->dim.y, vhi->dim.z, "x/%03d.pgm", c.x);
 
 	stb.st_size = vhi->dim.x * vhi->dim.z * C;
 	for (c.y = 0, c.x = c.z = -1; c.y < vhi->dim.y; c.y++)
 		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
-		    vhi->dim.x, vhi->dim.z, "y/%d.pgm", c.y);
+		    vhi->dim.x, vhi->dim.z, "y/%03d.pgm", c.y);
 
 	stb.st_size = vhi->dim.x * vhi->dim.y * C;
 	for (c.z = 0, c.x = c.y = -1; c.z < vhi->dim.z; c.z++)
 		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
-		    vhi->dim.x, vhi->dim.y, "z/%d.pgm", c.z);
+		    vhi->dim.x, vhi->dim.y, "z/%03d.pgm", c.z);
 
 	return (0);
 }

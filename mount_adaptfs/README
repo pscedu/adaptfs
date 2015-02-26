@@ -21,3 +21,5 @@ Examples
 
     # adaptctl load vh0 vh.so width=272 height=384 depth=368
       colordepth=3 input=/antonfs/scratch/awetzel/vvfs-volumes/small_vh2_272_384_368.vol
+
+    # adaptctl transform vh0 invert_color
