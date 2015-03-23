@@ -133,11 +133,10 @@ void
 adaptfs_add_dirent(struct inode *pino, const char *fn, mode_t mode,
     uint64_t inum)
 {
-	size_t sum, oldoff;
 	struct stat stb;
+	size_t sum;
 	int dsize;
 
-	oldoff = pino->i_dsize;
 	dsize = add_dirent(NULL, 0, fn, NULL, 0);
 	sum = pino->i_dsize + dsize;
 	memset(&stb, 0, sizeof(stb));
