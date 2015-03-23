@@ -160,7 +160,7 @@ fsop_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
 		return;
 	}
 
-	if (off + size > ino->i_stb.st_size)
+	if (off + (off_t)size > ino->i_stb.st_size)
 		size = ino->i_stb.st_size - off;
 
 	pg = getpage(ino->i_inst, ino);
