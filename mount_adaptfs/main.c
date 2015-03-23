@@ -12,6 +12,7 @@
 #include "pfl/pool.h"
 #include "pfl/stat.h"
 #include "pfl/subsys.h"
+#include "pfl/timerthr.h"
 
 #include "adaptfs.h"
 #include "ctl.h"
@@ -157,6 +158,9 @@ main(int argc, char *argv[])
 	    pg_lentry, PPMF_AUTO, 64, 64, 0, NULL, NULL, NULL, "page");
 	page_pool = psc_poolmaster_getmgr(&page_poolmaster);
 
+	pscthr_init(THRT_USAGETIMER, pfl_rusagethr_main, NULL,
+	    0, "usagetimerthr");
+	pfl_opstimerthr_spawn(THRT_OPSTIMER, "opstimerthr");
 	ctlthr_spawn();
 
 	exit(pscfs_main(0));
