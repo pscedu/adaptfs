@@ -21,7 +21,9 @@ struct inode;
 enum {
 	THRT_CTL,
 	THRT_CTLAC,
-	THRT_FSMGR
+	THRT_FSMGR,
+	THRT_OPSTIMER,
+	THRT_USAGETIMER,
 };
 
 struct module {

@@ -290,6 +290,8 @@ fsop_unlink(struct pscfs_req *pfr, pscfs_inum_t pinum,
 }
 
 struct pscfs adaptfs_ops = {
+	PSCFS_INIT,
+	"adaptfs",
 	fsop_access,
 	fsop_release,
 	fsop_releasedir,
