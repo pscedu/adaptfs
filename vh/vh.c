@@ -124,17 +124,17 @@ adaptfs_module_load(struct adaptfs_instance *inst,
 	stb.st_size = vhi->dim.y * vhi->dim.z * C;
 	for (c.x = 0, c.y = c.z = -1; c.x < vhi->dim.x; c.x++)
 		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
-		    vhi->dim.y, vhi->dim.z, "x/%03d.pgm", c.x);
+		    vhi->dim.y, vhi->dim.z, "x/%05d.pgm", c.x);
 
 	stb.st_size = vhi->dim.x * vhi->dim.z * C;
 	for (c.y = 0, c.x = c.z = -1; c.y < vhi->dim.y; c.y++)
 		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
-		    vhi->dim.x, vhi->dim.z, "y/%03d.pgm", c.y);
+		    vhi->dim.x, vhi->dim.z, "y/%05d.pgm", c.y);
 
 	stb.st_size = vhi->dim.x * vhi->dim.y * C;
 	for (c.z = 0, c.x = c.y = -1; c.z < vhi->dim.z; c.z++)
 		adaptfs_create_vfile(inst, &c, sizeof(c), &stb,
-		    vhi->dim.x, vhi->dim.y, "z/%03d.pgm", c.z);
+		    vhi->dim.x, vhi->dim.y, "z/%05d.pgm", c.z);
 
 	return (0);
 }
