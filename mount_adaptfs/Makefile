@@ -15,7 +15,6 @@ SRCS+=		${PFL_BASE}/fuse.c
 
 LDFLAGS+=	-ldl -rdynamic
 MODULES+=	pthread pscfs ctl clock pfl
-DEBUG=		0
 
 DEFINES+=	-DADAPTFS_VERSION=$$(git log | grep -c ^commit)
 
