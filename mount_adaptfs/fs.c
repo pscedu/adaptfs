@@ -195,7 +195,10 @@ fsop_readdir(struct pscfs_req *pfr, size_t size, off_t off,
 	if (pos >= psc_dynarray_len(&ino->i_doffs))
 		pos = psc_dynarray_len(&ino->i_doffs) - 1;
 	toff = (off_t)psc_dynarray_getpos(&ino->i_doffs, pos);
-	pscfs_reply_readdir(pfr, PSC_AGP(ino->i_dents, off), toff - off, 0);
+	if (toff - off > (off_t)size)
+		toff = (off_t)psc_dynarray_getpos(&ino->i_doffs, pos - 1);
+	pscfs_reply_readdir(pfr, PSC_AGP(ino->i_dents, off), toff - off,
+	    0);
 }
 
 void
