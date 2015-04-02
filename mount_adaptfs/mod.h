@@ -37,6 +37,7 @@ struct page {
 };
 
 #define PGF_LOADING		(1 << 0)
+#define PGF_VALID		(1 << 1)
 
 struct datafile *
 	 adaptfs_getdatafile(const char *, ...);

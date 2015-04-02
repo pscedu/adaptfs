@@ -14,6 +14,7 @@
 #include "pfl/alloc.h"
 #include "pfl/fmtstr.h"
 #include "pfl/fs.h"
+#include "pfl/fsmod.h"
 #include "pfl/pool.h"
 #include "pfl/str.h"
 
@@ -95,7 +96,7 @@ putpage(struct page *pg)
 }
 
 struct page *
-getpage(struct pscfs_request *pfr, struct adaptfs_instance *inst,
+getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
     struct inode *ino)
 {
 	struct psc_hashbkt *b;

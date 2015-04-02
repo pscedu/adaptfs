@@ -28,8 +28,8 @@ enum {
 
 struct module {
 	void			 *m_handle;	/* dlopen(3) handle */
-	void			(*m_readf)(struct adaptfs_instance *,
-				    void *, size_t, off_t, void *);
+	int			(*m_readf)(struct adaptfs_instance *,
+				    void *, size_t, off_t, void *, int *);
 };
 
 struct inode {
