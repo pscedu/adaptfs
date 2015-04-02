@@ -23,7 +23,6 @@ struct adaptfs_instance {
 	int			  inst_nargs;
 	void			 *inst_ptr;
 	struct psc_hashtbl	  inst_pagetbl;
-	struct psc_spinlock	  inst_lock;
 };
 
 struct page {

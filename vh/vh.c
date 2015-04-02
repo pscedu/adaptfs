@@ -30,7 +30,7 @@ struct instance {
 
 int
 adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
-    size_t len, off_t off, void *pg)
+    size_t len, off_t off, void *pg, int *intr)
 {
 	struct instance *vhi = inst->inst_ptr;
 	struct coord i, *c = iptr;
@@ -49,6 +49,8 @@ adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
 				*op++ = ip[off + 1];
 				*op++ = ip[off + 2];
 			}
+			if (*intr)
+				return (-1);
 		}
 	} else if (c->y != -1) {
 		/* y plane */
@@ -56,8 +58,12 @@ adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
 			ip = (unsigned char *)vhi->base +
 			    (i.z * vhi->dim.x * vhi->dim.y +
 			    c->y * vhi->dim.x) * C;
-			for (i.x = C * vhi->dim.x; --i.x >= 0; )
+			for (i.x = C * vhi->dim.x; --i.x >= 0; ) {
 				*op++ = *ip++;
+				// XXX use machine wordsize
+			}
+			if (*intr)
+				return (-1);
 		}
 	} else {
 		/* z plane */

@@ -22,7 +22,6 @@ instance_load(const char *name, const char *fn, const char **argnames,
 	struct module *m;
 
 	inst = PSCALLOC(sizeof(*inst));
-	INIT_SPINLOCK(&inst->inst_lock);
 	inst->inst_module = m = PSCALLOC(sizeof(*m));
 	inst->inst_name = pfl_strdup(name);
 	inst->inst_argnames = argnames;

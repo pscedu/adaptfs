@@ -95,53 +95,57 @@ putpage(struct page *pg)
 }
 
 struct page *
-getpage(struct adaptfs_instance *inst, struct inode *ino)
+getpage(struct pscfs_request *pfr, struct adaptfs_instance *inst,
+    struct inode *ino)
 {
+	struct psc_hashbkt *b;
+	struct psc_hashtbl *h;
 	struct page *pg;
-	int n;
+	int n, rc;
 
-	pg = psc_hashtbl_search(&inst->inst_pagetbl, NULL, getpage_cb,
-	    &ino->i_inum);
-	if (pg)
-		PFL_GOTOERR(out, 0);
-
-	spinlock(&inst->inst_lock);
-	pg = psc_hashtbl_search(&inst->inst_pagetbl, NULL, getpage_cb,
-	    &ino->i_inum);
+	h = &inst->inst_pagetbl;
+	b = psc_hashbkt_get(h, &ino->i_inum);
+	pg = psc_hashtbl_search(h, NULL, getpage_cb, &ino->i_inum);
 	if (pg) {
-		freelock(&inst->inst_lock);
-		PFL_GOTOERR(out, 0);
-	}
+		psc_hashbkt_put(h, b);
 
-	pg = psc_pool_get(page_pool);
-	memset(pg, 0, sizeof(*pg));
-	INIT_SPINLOCK(&pg->pg_lock);
-	pg->pg_refcnt = 1;
-	pg->pg_inum = ino->i_inum;
-	pg->pg_flags = PGF_LOADING;
-	pg->pg_base = PSCALLOC(ino->i_stb.st_size);
-	psc_hashent_init(&inst->inst_pagetbl, pg);
-	psc_hashtbl_add_item(&inst->inst_pagetbl, pg);
-	freelock(&inst->inst_lock);
+		while (pg->pg_flags & PGF_LOADING) {
+			psc_waitq_wait(&pg->pg_waitq, &pg->pg_lock);
+			spinlock(&pg->pg_lock);
+		}
+		if (pg->pg_flags & PGF_VALID) {
+			freelock(&pg->pg_lock);
+			return (pg);
+		}
+		pg->pg_flags = PGF_LOADING;
+		freelock(&pg->pg_lock);
+	} else {
+		// XXX bucket lock
+		pg = psc_pool_get(page_pool);
+		memset(pg, 0, sizeof(*pg));
+		INIT_SPINLOCK(&pg->pg_lock);
+		pg->pg_refcnt = 1;
+		pg->pg_inum = ino->i_inum;
+		pg->pg_flags = PGF_LOADING;
+		pg->pg_base = PSCALLOC(ino->i_stb.st_size);
+		psc_hashent_init(h, pg);
+		psc_hashtbl_add_item(h, pg);
+		psc_hashbkt_put(h, b);
+	}
 
 	n = snprintf(pg->pg_base, ino->i_stb.st_size,
 	    "P6\n%6d %6d\n%3d\n", ino->i_img_width, ino->i_img_height,
 	    255);
 	psc_assert(n >= 0);
-	inst->inst_module->m_readf(inst, ino->i_ptr, ino->i_stb.st_size,
-	    0, pg->pg_base + n);
+	rc = inst->inst_module->m_readf(inst, ino->i_ptr,
+	    ino->i_stb.st_size, 0, pg->pg_base + n,
+	    &pfr->pfr_interrupted);
 
 	spinlock(&pg->pg_lock);
+	if (rc == 0)
+		pg->pg_flags |= PGF_VALID;
 	pg->pg_flags &= ~PGF_LOADING;
 	psc_waitq_wakeall(&pg->pg_waitq);
-	freelock(&pg->pg_lock);
-	return (pg);
-
- out:
-	while (pg->pg_flags & PGF_LOADING) {
-		psc_waitq_wait(&pg->pg_waitq, &pg->pg_lock);
-		spinlock(&pg->pg_lock);
-	}
 	freelock(&pg->pg_lock);
 	return (pg);
 }
@@ -163,7 +167,7 @@ fsop_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
 	if (off + (off_t)size > ino->i_stb.st_size)
 		size = ino->i_stb.st_size - off;
 
-	pg = getpage(ino->i_inst, ino);
+	pg = getpage(pfr, ino->i_inst, ino);
 	iov.iov_base = pg->pg_base + off;
 	iov.iov_len = size;
 	pscfs_reply_read(pfr, &iov, 1, 0);
