@@ -3,7 +3,7 @@
 
 /*
  * Example:
- *	# adaptctl load sysfilt0 sysfilt.so src=vh0 cmd='despeckle %s %s'
+ *	# adaptctl load sysfilt0 sysfilt.so src=vh0 cmd='convert %s -gaussian-blur 0x8 %s'
  *
  * Notes:
  *	- the @cmd must accept `-' and `-' as command line arguments for
@@ -38,38 +38,29 @@ adaptfs_module_read(struct adaptfs_instance *inst,
     struct adaptfs_inode *ino, size_t len, off_t off, void *pg,
     struct pscfs_req *pfr)
 {
+	char srcfn[PATH_MAX], dstfn[PATH_MAX];
 	struct sysfilt_instance *sf_inst = inst->inst_ptr;
 	struct sysfilt_inode *sf_ino = ino->i_ptr;
-	struct page *srcpg;
-	struct iovec iov;
-	char fn[PATH_MAX];
+	char *cmd, **cmdv;
 
-	srcpg = getpage(pfr, sf_inst->srcinst, sf_ino->srcino);
-
-	adaptfs_inode_memfile(ino, fn, sizeof(fn));
-
-	(void)iov;
 	(void)len;
 	(void)off;
-	(void)srcpg;
 	(void)pg;
-#if 0
+	(void)pfr;
+
+	adaptfs_inode_memfile(sf_ino->srcino, srcfn, sizeof(srcfn));
+	adaptfs_inode_memfile(ino, dstfn, sizeof(dstfn));
+
 	switch (fork()) {
 	case -1:
 		err(1, "fork");
 	case 0:
-		execvp();
-		err(1, "exec");
-		break;
-	default:
+		asprintf(&cmd, sf_inst->syscmd, srcfn, dstfn);
+		cmdv = pfl_str_split(cmd);
+		execvp(cmdv[0], cmdv);
+		err(1, "exec %s", cmd);
 		break;
 	}
-
-	iov.iov_base = pg;
-	iov.iov_len = len;
-	vmsplice(infd, &iov, niov, 0);
-	splice();
-#endif
 	return (0);
 }
 
