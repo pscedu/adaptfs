@@ -13,7 +13,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "pfl/fsmod.h"
+
 #include "../mount_adaptfs/mod.h"
+#include "../mount_adaptfs/adaptfs.h"
 
 #define C 3
 
@@ -29,11 +32,12 @@ struct instance {
 };
 
 int
-adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
-    size_t len, off_t off, void *pg, int *intr)
+adaptfs_module_read(struct adaptfs_instance *inst,
+    struct adaptfs_inode *ino, size_t len, off_t off, void *pg,
+    struct pscfs_req *pfr)
 {
 	struct instance *vhi = inst->inst_ptr;
-	struct coord i, *c = iptr;
+	struct coord i, *c = ino->i_ptr;
 	unsigned char *ip, *op = pg;
 
 	(void)len;
@@ -49,7 +53,7 @@ adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
 				*op++ = ip[off + 1];
 				*op++ = ip[off + 2];
 			}
-			if (*intr)
+			if (pfr->pfr_interrupted)
 				return (-1);
 		}
 	} else if (c->y != -1) {
@@ -62,7 +66,7 @@ adaptfs_module_read(struct adaptfs_instance *inst, void *iptr,
 				*op++ = *ip++;
 				// XXX use machine wordsize
 			}
-			if (*intr)
+			if (pfr->pfr_interrupted)
 				return (-1);
 		}
 	} else {
