@@ -8,6 +8,9 @@
 
 struct stat;
 
+struct adaptfs_module;
+struct adaptfs_inode;
+
 struct datafile {
 	int			  df_fd;
 	struct pfl_hashentry	  df_hentry;
@@ -16,7 +19,7 @@ struct datafile {
 };
 
 struct adaptfs_instance {
-	struct module		 *inst_module;
+	struct adaptfs_module	 *inst_module;
 	const char		 *inst_name;
 	const char		**inst_argnames;
 	const char		**inst_argvals;
@@ -32,6 +35,7 @@ struct page {
 	int			  pg_flags;
 	struct psc_waitq	  pg_waitq;
 	void			 *pg_base;
+	size_t			  pg_len;
 	uint64_t		  pg_inum;
 	struct pfl_hashentry	  pg_hentry;
 };
@@ -43,5 +47,7 @@ struct datafile *
 	 adaptfs_getdatafile(const char *, ...);
 void	 adaptfs_create_vfile(struct adaptfs_instance *, void *, size_t,
 	    struct stat *, int, int, const char *, ...);
+
+void	 adaptfs_inode_memfile(const struct adaptfs_inode *, char *, size_t);
 
 #endif /* _MOD_H_ */

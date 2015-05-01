@@ -12,14 +12,14 @@
 #include "adaptfs.h"
 #include "mod.h"
 
-struct module *
+struct adaptfs_module *
 instance_load(const char *name, const char *fn, const char **argnames,
     const char **argvals, int nargs)
 {
 	int (*loadf)(struct adaptfs_instance *, const char **,
 	    const char **, int);
 	struct adaptfs_instance *inst;
-	struct module *m;
+	struct adaptfs_module *m;
 
 	inst = PSCALLOC(sizeof(*inst));
 	inst->inst_module = m = PSCALLOC(sizeof(*m));

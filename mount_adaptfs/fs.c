@@ -69,7 +69,7 @@ fsop_fsyncdir(struct pscfs_req *pfr, int datasync_only, void *data)
 void
 fsop_getattr(struct pscfs_req *pfr, pscfs_inum_t inum)
 {
-	struct inode *ino;
+	struct adaptfs_inode *ino;
 
 	ino = inode_lookup(inum);
 	pscfs_reply_getattr(pfr, &ino->i_stb, pscfs_attr_timeout, 0);
@@ -89,7 +89,7 @@ void
 fsop_lookup(struct pscfs_req *pfr, pscfs_inum_t pinum,
     const char *name)
 {
-	struct inode *ino, *pino;
+	struct adaptfs_inode *ino, *pino;
 
 	pino = inode_lookup(pinum);
 	ino = name_lookup(pino, name);
@@ -127,7 +127,7 @@ void
 fsop_open(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 {
 	int rc = 0, rflags = PSCFS_OPENF_DIO;
-	struct inode *ino = NULL;
+	struct adaptfs_inode *ino = NULL;
 
 	(void)oflags;
 
@@ -145,7 +145,7 @@ void
 fsop_opendir(struct pscfs_req *pfr, pscfs_inum_t inum, int oflags)
 {
 	int rc = 0, rflags = PSCFS_OPENF_KEEPCACHE;
-	struct inode *ino;
+	struct adaptfs_inode *ino;
 
 	(void)oflags;
 
@@ -167,7 +167,7 @@ void
 fsop_readdir(struct pscfs_req *pfr, size_t size, off_t off,
     void *data)
 {
-	struct inode *ino = data;
+	struct adaptfs_inode *ino = data;
 	off_t toff;
 	int pos;
 

@@ -73,6 +73,8 @@ page_reap(struct psc_poolmgr *m)
 	struct page *pg = NULL;
 	int n = 0;
 
+	//madvise(pg->pg_base, pg->pg_len, MADV_DONTNEED);
+	munmap(pg->pg_base, pg->pg_len);
 	psc_pool_return(m, pg);
 	return (n);
 }
@@ -97,7 +99,7 @@ putpage(struct page *pg)
 
 struct page *
 getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
-    struct inode *ino)
+    struct adaptfs_inode *ino)
 {
 	struct psc_hashbkt *b;
 	struct psc_hashtbl *h;
@@ -121,26 +123,38 @@ getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
 		pg->pg_flags = PGF_LOADING;
 		freelock(&pg->pg_lock);
 	} else {
-		// XXX bucket lock
+		char fn[PATH_MAX];
+		int fd;
+
+		adaptfs_inode_memfile(ino, fn, sizeof(fn));
+		fd = open(fn, O_RDWR | O_CREAT | O_TRUNC, 0600);
+		if (fd == -1)
+			err(1, "%s", fn);
+
+		// XXX don't hold bucket lock
 		pg = psc_pool_get(page_pool);
 		memset(pg, 0, sizeof(*pg));
 		INIT_SPINLOCK(&pg->pg_lock);
 		pg->pg_refcnt = 1;
 		pg->pg_inum = ino->i_inum;
 		pg->pg_flags = PGF_LOADING;
-		pg->pg_base = PSCALLOC(ino->i_stb.st_size);
+		pg->pg_len = ino->i_stb.st_size;
+		pg->pg_base = mmap(NULL, pg->pg_len, PROT_READ |
+		    PROT_WRITE, MAP_SHARED | MAP_HUGETLB
+		    /* | MAP_POPULATE */, fd, 0);
 		psc_hashent_init(h, pg);
 		psc_hashtbl_add_item(h, pg);
 		psc_hashbkt_put(h, b);
+
+		close(fd);
 	}
 
 	n = snprintf(pg->pg_base, ino->i_stb.st_size,
 	    "P6\n%6d %6d\n%3d\n", ino->i_img_width, ino->i_img_height,
 	    255);
 	psc_assert(n >= 0);
-	rc = inst->inst_module->m_readf(inst, ino->i_ptr,
-	    ino->i_stb.st_size, 0, pg->pg_base + n,
-	    &pfr->pfr_interrupted);
+	rc = inst->inst_module->m_readf(inst, ino, ino->i_stb.st_size,
+	    0, pg->pg_base + n, pfr);
 
 	spinlock(&pg->pg_lock);
 	if (rc == 0)
@@ -154,7 +168,7 @@ getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
 void
 fsop_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
 {
-	struct inode *ino = data;
+	struct adaptfs_inode *ino = data;
 	struct iovec iov;
 	struct page *pg;
 

@@ -22,10 +22,10 @@
 struct psc_poolmaster	 page_poolmaster;
 struct psc_poolmgr	*page_pool;
 
-char		 mountpoint[PATH_MAX];
-const char	*progname;
-char		*ctlsockfn = PATH_CTLSOCK;
-struct inode	*rootino;
+char			 mountpoint[PATH_MAX];
+const char		*progname;
+char			*ctlsockfn = PATH_CTLSOCK;
+struct adaptfs_inode	*rootino;
 
 void
 unmount(const char *mp)
@@ -39,7 +39,7 @@ unmount(const char *mp)
 	    mp, mp, mp);
 	if (rc == -1)
 		psc_fatal("snprintf: umount %s", mp);
-	if (rc >= sizeof(buf))
+	if ((size_t)rc >= sizeof(buf))
 		psc_fatalx("snprintf: umount %s: too long", mp);
 	if (system(buf) == -1)
 		psclog_warn("system(%s)", buf);
@@ -143,6 +143,8 @@ main(int argc, char *argv[])
 	psc_hashtbl_init(&datafiles, PHTF_STR, struct datafile,
 	    df_fn, df_hentry, 97, NULL, "datafiles");
 
+	mkdir(PATH_ADAPTFS_MEM, 0700);
+
 	PFL_GETTIMESPEC(&ts);
 	memset(&rootstb, 0, sizeof(rootstb));
 	rootstb.st_mode = S_IFDIR | 0755;
@@ -155,7 +157,8 @@ main(int argc, char *argv[])
 	psc_dynarray_add(&pscfs_modules, &adaptfs_ops);
 
 	psc_poolmaster_init(&page_poolmaster, struct page,
-	    pg_lentry, PPMF_AUTO, 64, 64, 0, NULL, NULL, NULL, "page");
+	    pg_lentry, PPMF_AUTO | PPMF_ALIGN, 64, 64, 0, NULL, NULL,
+	    NULL, "page");
 	page_pool = psc_poolmaster_getmgr(&page_poolmaster);
 
 	pscthr_init(THRT_USAGETIMER, pfl_rusagethr_main, NULL,

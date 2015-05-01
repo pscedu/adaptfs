@@ -13,10 +13,13 @@
 
 #include "mod.h"
 
-#define BLKSIZE (1024 * 1024)
+#define BLKSIZE			(1024 * 1024)	/* recommended application I/O block size*/
+
+#define PATH_ADAPTFS_MEM	 "/dev/shm/adaptfs"
 
 struct pscfs_req;
-struct inode;
+
+struct adaptfs_inode;
 
 enum {
 	THRT_CTL,
@@ -26,13 +29,14 @@ enum {
 	THRT_USAGETIMER,
 };
 
-struct module {
+struct adaptfs_module {
 	void			 *m_handle;	/* dlopen(3) handle */
 	int			(*m_readf)(struct adaptfs_instance *,
-				    void *, size_t, off_t, void *, int *);
+				    struct adaptfs_inode *, size_t, off_t,
+				    void *, struct pscfs_req *);
 };
 
-struct inode {
+struct adaptfs_inode {
 	struct pfl_hashentry	 i_hentry;
 	uint64_t		 i_inum;
 	uint64_t		 i_key;
@@ -53,21 +57,29 @@ struct inode {
 
 #define INOF_DIRTY	(1 << 0)
 
-void		 fsop_read(struct pscfs_req *, size_t, off_t, void *);
+void	fsop_read(struct pscfs_req *, size_t, off_t, void *);
 
-struct inode	*inode_lookup(uint64_t);
-struct inode	*inode_create(struct adaptfs_instance *, struct inode *,
-		    const char *, void *, const struct stat *);
+struct adaptfs_inode *
+	inode_lookup(uint64_t);
+struct adaptfs_inode *
+	inode_create(struct adaptfs_instance *, struct adaptfs_inode *,
+	    const char *, void *, const struct stat *);
 
-struct inode	*name_lookup(struct inode *, const char *);
+struct adaptfs_inode *
+	name_lookup(struct adaptfs_inode *, const char *);
 
-struct module	*instance_load(const char *, const char *,
-		    const char **, const char **, int);
+struct adaptfs_module *
+	instance_load(const char *, const char *, const char **,
+	    const char **, int);
 
-void ctlthr_spawn(void);
+struct page *
+	getpage(struct pscfs_req *, struct adaptfs_instance *,
+	    struct adaptfs_inode *);
+
+void	ctlthr_spawn(void);
 
 extern char			*ctlsockfn;
-extern struct inode		*rootino;
+extern struct adaptfs_inode	*rootino;
 extern struct psc_hashtbl	 datafiles;
 extern struct psc_poolmgr	*page_pool;
 

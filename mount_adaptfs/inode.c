@@ -65,8 +65,8 @@ namelookupcmp(const void *a, const void *b)
 	    y->pfd_namelen));
 }
 
-struct inode *
-name_lookup(struct inode *pino, const char *fn)
+struct adaptfs_inode *
+name_lookup(struct adaptfs_inode *pino, const char *fn)
 {
 	struct pscfs_dirent *dent;
 	struct namelookup dq;
@@ -97,7 +97,7 @@ name_lookup(struct inode *pino, const char *fn)
 	return (inode_lookup(dent->pfd_ino));
 }
 
-struct inode *
+struct adaptfs_inode *
 inode_lookup(uint64_t inum)
 {
 	if (inum == 0 ||
@@ -130,8 +130,8 @@ add_dirent(void *buf, size_t bufsize, const char *name,
 }
 
 void
-adaptfs_add_dirent(struct inode *pino, const char *fn, mode_t mode,
-    uint64_t inum)
+adaptfs_add_dirent(struct adaptfs_inode *pino, const char *fn,
+    mode_t mode, uint64_t inum)
 {
 	struct stat stb;
 	size_t sum;
@@ -154,11 +154,11 @@ adaptfs_add_dirent(struct inode *pino, const char *fn, mode_t mode,
 	psc_dynarray_add(&pino->i_doffs, PSC_AGP(sum, 0));
 }
 
-struct inode *
-inode_create(struct adaptfs_instance *inst, struct inode *pino,
+struct adaptfs_inode *
+inode_create(struct adaptfs_instance *inst, struct adaptfs_inode *pino,
     const char *fn, void *ptr, const struct stat *stb)
 {
-	struct inode *ino;
+	struct adaptfs_inode *ino;
 
 	adaptfs_sfb.f_files++;
 
@@ -190,8 +190,8 @@ void
 adaptfs_create_vfile(struct adaptfs_instance *inst, void *ptr, size_t len,
     struct stat *stb, int width, int height, const char *fmt, ...)
 {
+	struct adaptfs_inode *ino, *pino;
 	char *p, *np, fn[PATH_MAX];
-	struct inode *ino, *pino;
 	va_list ap;
 	int n;
 
@@ -226,4 +226,11 @@ adaptfs_create_vfile(struct adaptfs_instance *inst, void *ptr, size_t len,
 	psc_atomic64_add(&adaptfs_volsize, stb->st_size);
 	adaptfs_sfb.f_blocks = psc_atomic64_read(&adaptfs_volsize) /
 	    adaptfs_sfb.f_frsize;
+}
+
+void
+adaptfs_inode_memfile(const struct adaptfs_inode *ino, char *fn,
+    size_t size)
+{
+	snprintf(fn, size, PATH_ADAPTFS_MEM "/%ld", ino->i_stb.st_ino);
 }
