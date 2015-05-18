@@ -39,7 +39,7 @@ unmount(const char *mp)
 	    mp, mp, mp);
 	if (rc == -1)
 		psc_fatal("snprintf: umount %s", mp);
-	if (rc >= (int)sizeof(buf))
+	if (rc >= sizeof(buf))
 		psc_fatalx("snprintf: umount %s: too long", mp);
 	if (system(buf) == -1)
 		psclog_warn("system(%s)", buf);
