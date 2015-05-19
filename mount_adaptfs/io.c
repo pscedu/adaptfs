@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+#include <linux/mman.h>
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -129,8 +131,9 @@ getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
 		adaptfs_inode_memfile(ino, fn, sizeof(fn));
 		fd = open(fn, O_RDWR | O_CREAT | O_TRUNC, 0600);
 		if (fd == -1)
-			err(1, "%s", fn);
-		ftruncate(fd, ino->i_stb.st_size);
+			err(1, "create %s", fn);
+		if (ftruncate(fd, ino->i_stb.st_size) == -1)
+			err(1, "truncate %s", fn);
 
 		// XXX don't hold bucket lock
 		pg = psc_pool_get(page_pool);

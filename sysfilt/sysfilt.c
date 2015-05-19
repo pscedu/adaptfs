@@ -55,7 +55,8 @@ adaptfs_module_read(struct adaptfs_instance *inst,
 	case -1:
 		err(1, "fork");
 	case 0:
-		asprintf(&cmd, sf_inst->syscmd, srcfn, dstfn);
+		if (asprintf(&cmd, sf_inst->syscmd, srcfn, dstfn) == -1)
+			err(1, "asprintf");
 		cmdv = pfl_str_split(cmd);
 		execvp(cmdv[0], cmdv);
 		err(1, "exec %s", cmd);
