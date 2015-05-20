@@ -38,7 +38,7 @@ adaptfs_getdatafile(const char *fmt, ...)
 	vsnprintf(fn, sizeof(fn), fmt, ap);
 	va_end(ap);
 
-	df = psc_hashtbl_search(&datafiles, NULL, NULL, fn);
+	df = psc_hashtbl_search(&datafiles, fn);
 	if (df)
 		return (df);
 
@@ -82,7 +82,7 @@ page_reap(struct psc_poolmgr *m)
 }
 
 void
-getpage_cb(void *a)
+getpage_cb(void *a, __unusedx void *arg)
 {
 	struct page *pg = a;
 
@@ -110,7 +110,7 @@ getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
 
 	h = &inst->inst_pagetbl;
 	b = psc_hashbkt_get(h, &ino->i_inum);
-	pg = psc_hashtbl_search(h, NULL, getpage_cb, &ino->i_inum);
+	pg = psc_hashtbl_search_cb(h, getpage_cb, NULL, &ino->i_inum);
 	if (pg) {
 		psc_hashbkt_put(h, b);
 
