@@ -13,9 +13,9 @@ SRCS+=		mod.c
 
 SRCS+=		${PFL_BASE}/fuse.c
 
-LDFLAGS+=	-ldl -rdynamic
-MODULES+=	pthread pscfs ctl clock pfl
+LDFLAGS+=	-ldl -rdynamic -Wl,--whole-archive
+MODULES+=	pthread pscfs ctl clock pfl-whole
 
-DEFINES+=	-DADAPTFS_VERSION=$$(git log | grep -c ^commit)
+DEFINES+=	-DADAPTFS_VERSION=${REPO_VERSION}
 
 include ${MAINMK}
