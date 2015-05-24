@@ -12,6 +12,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -19,6 +20,7 @@
 #include <string.h>
 
 #include "pfl/str.h"
+#include "pfl/sys.h"
 #include "pfl/walk.h"
 
 #include "../mount_adaptfs/mod.h"
@@ -27,6 +29,7 @@
 struct sysfilt_instance {
 	char			*syscmd;
 	struct adaptfs_instance	*srcinst;
+	int			 skip;
 };
 
 struct sysfilt_inode {
@@ -35,23 +38,22 @@ struct sysfilt_inode {
 
 int
 adaptfs_module_read(struct adaptfs_instance *inst,
-    struct adaptfs_inode *ino, size_t len, off_t off, void *pg,
-    struct pscfs_req *pfr)
+    struct adaptfs_inode *ino, __unusedx size_t len,
+    __unusedx off_t off, __unusedx void *pg, struct pscfs_req *pfr)
 {
-	char srcfn[PATH_MAX], dstfn[PATH_MAX];
+	char srcfn[PATH_MAX], dstfn[PATH_MAX], *cmd, **cmdv;
 	struct sysfilt_instance *sf_inst = inst->inst_ptr;
 	struct sysfilt_inode *sf_ino = ino->i_ptr;
-	char *cmd, **cmdv;
+	struct page *srcpg;
+	int pid, status;
 
-	(void)len;
-	(void)off;
-	(void)pg;
-	(void)pfr;
+	srcpg = getpage(pfr, sf_ino->srcino);
 
 	adaptfs_inode_memfile(sf_ino->srcino, srcfn, sizeof(srcfn));
 	adaptfs_inode_memfile(ino, dstfn, sizeof(dstfn));
 
-	switch (fork()) {
+	pid = fork();
+	switch (pid) {
 	case -1:
 		err(1, "fork");
 	case 0:
@@ -62,23 +64,32 @@ adaptfs_module_read(struct adaptfs_instance *inst,
 		err(1, "exec %s", cmd);
 		break;
 	}
+	waitpid(pid, &status, 0);
+	// XXX check return status
+	putpage(srcpg);
 	return (0);
 }
 
 int
-sysfilt_load_file(FTSENT *f, void *inst)
+sysfilt_load_file(FTSENT *f, void *arg)
 {
+	struct adaptfs_instance *inst = arg;
+	struct sysfilt_instance *sf_inst = inst->inst_ptr;
 	struct sysfilt_inode sf_ino;
 	struct adaptfs_inode *ino;
 
+	if (f->fts_info != FTS_F)
+		return (0);
+
 	sf_ino.srcino = ino = inode_lookup(f->fts_statp->st_ino);
+	f->fts_statp->st_size -= snprintf(NULL, 0, "P6\n%d %d\n%d\n",
+	    ino->i_img_width, ino->i_img_height, 255);
+
 	adaptfs_create_vfile(inst, &sf_ino, sizeof(sf_ino),
 	    f->fts_statp, ino->i_img_width, ino->i_img_height, "%s",
-	    f->fts_path);
+	    f->fts_path + sf_inst->skip);
 	return (0);
 }
-
-extern char *mountpoint;
 
 int
 adaptfs_module_load(struct adaptfs_instance *inst,
@@ -105,7 +116,11 @@ adaptfs_module_load(struct adaptfs_instance *inst,
 	if (src_name == NULL)
 		errx(1, "source dataset not specified");
 
-	snprintf(srcfn, sizeof(srcfn), "%s/%s", mountpoint, src_name);
+	sf_inst->skip = snprintf(srcfn, sizeof(srcfn), "%s/%s",
+	    adaptfs_mountpoint, src_name);
+	if (sf_inst->skip == -1)
+		err(1, "snprintf");
+	sf_inst->skip++;
 
 	pfl_filewalk(srcfn, PFL_FILEWALKF_RECURSIVE, NULL,
 	    sysfilt_load_file, inst);
