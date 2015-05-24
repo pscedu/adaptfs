@@ -46,7 +46,7 @@ struct page {
 struct datafile *
 	 adaptfs_getdatafile(const char *, ...);
 void	 adaptfs_create_vfile(struct adaptfs_instance *, void *, size_t,
-	    struct stat *, int, int, const char *, ...);
+	    const struct stat *, int, int, const char *, ...);
 
 void	 adaptfs_inode_memfile(const struct adaptfs_inode *, char *, size_t);
 

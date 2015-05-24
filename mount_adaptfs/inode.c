@@ -188,8 +188,9 @@ inode_create(struct adaptfs_instance *inst, struct adaptfs_inode *pino,
 
 void
 adaptfs_create_vfile(struct adaptfs_instance *inst, void *ptr, size_t len,
-    struct stat *stb, int width, int height, const char *fmt, ...)
+    const struct stat *ostb, int width, int height, const char *fmt, ...)
 {
+	struct stat stb = *ostb;
 	struct adaptfs_inode *ino, *pino;
 	char *p, *np, fn[PATH_MAX];
 	va_list ap;
@@ -209,21 +210,22 @@ adaptfs_create_vfile(struct adaptfs_instance *inst, void *ptr, size_t len,
 
 		ino = name_lookup(pino, p);
 		if (ino == NULL) {
-			stb->st_mode = S_IFDIR | 0755;
-			ino = inode_create(inst, pino, p, NULL, stb);
+			stb.st_mode = S_IFDIR | 0755;
+			ino = inode_create(inst, pino, p, NULL, &stb);
 		}
 	}
 
-	stb->st_mode = S_IFREG | 0644;
-	stb->st_nlink = 1;
-	stb->st_size += snprintf(NULL, 0, "P6\n%6d %6d\n%3d\n", 0, 0, 0);
-	stb->st_blksize = BLKSIZE;
-	stb->st_blocks = stb->st_size / 512;
-	ino = inode_create(inst, pino, p, pfl_memdup(ptr, len), stb);
+	stb.st_mode = S_IFREG | 0644;
+	stb.st_nlink = 1;
+	stb.st_size += snprintf(NULL, 0, "P6\n%d %d\n%d\n", width,
+	    height, 255);
+	stb.st_blksize = BLKSIZE;
+	stb.st_blocks = stb.st_size / 512;
+	ino = inode_create(inst, pino, p, pfl_memdup(ptr, len), &stb);
 	ino->i_img_width = width;
 	ino->i_img_height = height;
 
-	psc_atomic64_add(&adaptfs_volsize, stb->st_size);
+	psc_atomic64_add(&adaptfs_volsize, stb.st_size);
 	adaptfs_sfb.f_blocks = psc_atomic64_read(&adaptfs_volsize) /
 	    adaptfs_sfb.f_frsize;
 }

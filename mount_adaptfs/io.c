@@ -100,9 +100,9 @@ putpage(struct page *pg)
 }
 
 struct page *
-getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
-    struct adaptfs_inode *ino)
+getpage(struct pscfs_req *pfr, struct adaptfs_inode *ino)
 {
+	struct adaptfs_instance *inst = ino->i_inst;
 	struct psc_hashbkt *b;
 	struct psc_hashtbl *h;
 	struct page *pg;
@@ -125,15 +125,15 @@ getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
 		pg->pg_flags = PGF_LOADING;
 		freelock(&pg->pg_lock);
 	} else {
-		char fn[PATH_MAX];
+		char dummy = 0, fn[PATH_MAX];
 		int fd;
 
 		adaptfs_inode_memfile(ino, fn, sizeof(fn));
 		fd = open(fn, O_RDWR | O_CREAT | O_TRUNC, 0600);
 		if (fd == -1)
 			err(1, "create %s", fn);
-		if (ftruncate(fd, ino->i_stb.st_size) == -1)
-			err(1, "truncate %s", fn);
+		if (pwrite(fd, &dummy, 1, ino->i_stb.st_size - 1) != 1)
+			err(1, "pwrite %s", fn);
 
 		// XXX don't hold bucket lock
 		pg = psc_pool_get(page_pool);
@@ -144,8 +144,11 @@ getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
 		pg->pg_flags = PGF_LOADING;
 		pg->pg_len = ino->i_stb.st_size;
 		pg->pg_base = mmap(NULL, pg->pg_len, PROT_READ |
-		    PROT_WRITE, MAP_SHARED | MAP_HUGETLB
+		    PROT_WRITE, MAP_SHARED // | MAP_HUGETLB
 		    /* | MAP_POPULATE */, fd, 0);
+		if (pg->pg_base == MAP_FAILED)
+			err(1, "mmap %s", fn);
+
 		psc_hashent_init(h, pg);
 		psc_hashtbl_add_item(h, pg);
 		psc_hashbkt_put(h, b);
@@ -154,7 +157,7 @@ getpage(struct pscfs_req *pfr, struct adaptfs_instance *inst,
 	}
 
 	n = snprintf(pg->pg_base, ino->i_stb.st_size,
-	    "P6\n%6d %6d\n%3d\n", ino->i_img_width, ino->i_img_height,
+	    "P6\n%d %d\n%d\n", ino->i_img_width, ino->i_img_height,
 	    255);
 	psc_assert(n >= 0);
 	rc = inst->inst_module->m_readf(inst, ino, ino->i_stb.st_size,
@@ -186,7 +189,7 @@ fsop_read(struct pscfs_req *pfr, size_t size, off_t off, void *data)
 	if (off + (off_t)size > ino->i_stb.st_size)
 		size = ino->i_stb.st_size - off;
 
-	pg = getpage(pfr, ino->i_inst, ino);
+	pg = getpage(pfr, ino);
 	iov.iov_base = pg->pg_base + off;
 	iov.iov_len = size;
 	pscfs_reply_read(pfr, &iov, 1, 0);

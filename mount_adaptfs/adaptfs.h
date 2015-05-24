@@ -73,8 +73,8 @@ struct adaptfs_module *
 	    const char **, int);
 
 struct page *
-	getpage(struct pscfs_req *, struct adaptfs_instance *,
-	    struct adaptfs_inode *);
+	getpage(struct pscfs_req *, struct adaptfs_inode *);
+void	putpage(struct page *);
 
 void	ctlthr_spawn(void);
 
@@ -85,5 +85,7 @@ extern struct psc_poolmgr	*page_pool;
 
 extern struct statvfs		 adaptfs_sfb;
 extern struct pscfs		 adaptfs_ops;
+
+extern char			 adaptfs_mountpoint[];
 
 #endif /* _ADAPTFS_H_ */

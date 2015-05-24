@@ -30,7 +30,7 @@ instance_load(const char *name, const char *fn, const char **argnames,
 	psc_hashtbl_init(&inst->inst_pagetbl, 0, struct page,
 	    pg_inum, pg_hentry, 97, NULL, "pg-%s", name);
 
-	m->m_handle = dlopen(fn, RTLD_NOW);
+	m->m_handle = dlopen(fn, RTLD_NOW | RTLD_GLOBAL);
 	if (m->m_handle == NULL)
 		goto error;
 

@@ -12,7 +12,9 @@
 #include "pfl/pool.h"
 #include "pfl/stat.h"
 #include "pfl/subsys.h"
+#include "pfl/sys.h"
 #include "pfl/timerthr.h"
+#include "pfl/walk.h"
 
 #include "adaptfs.h"
 #include "ctl.h"
@@ -22,7 +24,7 @@
 struct psc_poolmaster	 page_poolmaster;
 struct psc_poolmgr	*page_pool;
 
-char			 mountpoint[PATH_MAX];
+char			 adaptfs_mountpoint[PATH_MAX];
 const char		*progname;
 char			*ctlsockfn = PATH_CTLSOCK;
 struct adaptfs_inode	*rootino;
@@ -126,14 +128,14 @@ main(int argc, char *argv[])
 		unmount(noncanon_mp);
 
 	/* canonicalize mount path */
-	if (realpath(noncanon_mp, mountpoint) == NULL)
+	if (realpath(noncanon_mp, adaptfs_mountpoint) == NULL)
 		psc_fatal("realpath %s", noncanon_mp);
 
 //	pflog_get_fsctx_uprog = slc_log_get_fsctx_uprog;
 //	pflog_get_fsctx_uid = slc_log_get_fsctx_uid;
 //	pflog_get_fsctx_pid = slc_log_get_fsctx_pid;
 
-	pscfs_mount(mountpoint, &args);
+	pscfs_mount(adaptfs_mountpoint, &args);
 	pscfs_freeargs(&args);
 
 	pscfs_entry_timeout = 8.;
@@ -143,6 +145,7 @@ main(int argc, char *argv[])
 	psc_hashtbl_init(&datafiles, PHTF_STR, struct datafile,
 	    df_fn, df_hentry, 97, NULL, "datafiles");
 
+	pfl_systemf("rm -rf %s", PATH_ADAPTFS_MEM);
 	mkdir(PATH_ADAPTFS_MEM, 0700);
 
 	PFL_GETTIMESPEC(&ts);
