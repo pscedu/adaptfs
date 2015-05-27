@@ -14,7 +14,7 @@ SRCS+=		mod.c
 SRCS+=		${PFL_BASE}/fuse.c
 
 LDFLAGS+=	-ldl -rdynamic -Wl,--whole-archive
-MODULES+=	pthread pscfs ctl clock pfl-whole
+MODULES+=	pthread pscfs ctl clock pfl-whole acl
 
 DEFINES+=	-DADAPTFS_VERSION=${REPO_VERSION}
 
