@@ -73,6 +73,7 @@ name_lookup(struct adaptfs_inode *pino, const char *fn)
 	void *p;
 	int n;
 
+	// XXX INO_LOCK(pino);
 	if (pino->i_flags & INOF_DIRTY) {
 		pino->i_flags &= ~INOF_DIRTY;
 
