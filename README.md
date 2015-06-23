@@ -72,3 +72,14 @@ specified in the commands given.
 	$ read /adaptfs/dataset1/.control/file0/blur-start:20-end:40-step:2/blur-22
 	$ read /adaptfs/dataset1/.control/shiftx-240.25/file0
 
+# Other notes
+
+* embedded pathname transform
+  * /adaptfs/dataset/.filter/path/file/blur:min:max:step/*
+* alias tinyurl module
+
+## TODO
+
+* imagemagick/graphicsmagick backend
+* benchmarks for paper: latency vs throughput
+* readahead madvise()
