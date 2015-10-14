@@ -5,8 +5,7 @@ include ${ROOTDIR}/Makefile.path
 
 PROG=		adaptctl
 SRCS+=		adaptctl.c
-SRCS+=		${PFL_BASE}/ctlcli.c
 
-MODULES+=	pthread pscfs-hdrs curses clock pfl
+MODULES+=      pthread pscfs-hdrs curses clock pfl ctlcli
 
 include ${PFLMK}
