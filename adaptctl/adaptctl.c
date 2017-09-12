@@ -9,10 +9,6 @@
 
 const char	*daemon_name = "mount_adaptfs";
 
-/*
- * # adaptctl load vh0 vh.so width=272 height=384 depth=368 colordepth=3 \
- *    input=/antonfs/scratch/awetzel/vvfs-volumes/small_vh2_272_384_368.vol
- */
 void
 cmd_load(int ac, char **av)
 {
@@ -29,10 +25,16 @@ cmd_load(int ac, char **av)
 	strlcpy(l->name, av[0], sizeof(l->name));
 	strlcpy(l->module, av[1], sizeof(l->module));
 	for (av += 2, i = 0; *av; av++, i++) {
+		if (i >= NARGS_MAX)
+			errx(1, "too many arguments");
 		val = strchr(*av, '=');
 		if (val == NULL)
 			errx(1, "invalid format");
 		*val++ = '\0';
+		if (strlen(*av) >= ARGNAME_MAX)
+			errx(1, "parameter name too long: %s", *av);
+		if (strlen(val) >= ARGVAL_MAX)
+			errx(1, "parameter value too long: %s", *av);
 		strlcpy(l->argnames[i], *av, ARGNAME_MAX);
 		strlcpy(l->argvals[i], val, ARGVAL_MAX);
 		l->nargs++;
@@ -46,9 +48,6 @@ struct psc_ctlshow_ent psc_ctlshow_tab[] = {
 struct psc_ctlmsg_prfmt psc_ctlmsg_prfmts[] = {
 	PSC_CTLMSG_PRFMT_DEFS
 /* LOAD		*/ , { NULL,	NULL,	sizeof(struct ctlmsg_load),	NULL }
-};
-
-psc_ctl_prthr_t psc_ctl_prthrs[] = {
 };
 
 struct psc_ctlcmd_req psc_ctlcmd_reqs[] = {
