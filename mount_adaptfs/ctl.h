@@ -17,8 +17,8 @@ struct ctlmsg_load {
 	char			 name[NAME_MAX + 1];
 	int			 nargs;
 	int			 _pad;
-	char			 argnames[ARGNAME_MAX][NARGS_MAX];
-	char			 argvals[ARGVAL_MAX][NARGS_MAX];
+	char			 argnames[NARGS_MAX][ARGNAME_MAX];
+	char			 argvals[NARGS_MAX][ARGVAL_MAX];
 };
 
 /* control message types */
